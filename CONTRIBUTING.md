@@ -79,4 +79,4 @@ run by `npm test` and the continuous integration process.
 - [.stylelintrc.json](.stylelintrc.json) rules are used for CSS files.
 - [.htmlvalidate.json](.htmlvalidate.json) rules are used for HTML files.
 
-In addition, the [Markdown All in One VSCode extension](https://github.com/yzhang-gh/vscode-markdown) is used for formatting markdown files and automatically updating the table of contents.
+In addition, the [Markdown All in One VSCode extension](https://github.com/yzhang-gh/vscode-markdown) is used automatically updating the table of contents in [README.MD](./README.md) and [Prettier](https://prettier.io/) can be used to format the markdown files.
