@@ -137,6 +137,7 @@ language is not English, you may consider also importing the English version for
 - [JMdict](https://github.com/themoeway/jmdict-yomitan#jmdict-for-yomitan-1) - There are daily automatically updated builds of JMdict for Yomitan available in this repository. It is available in multiple languages and formats, but we recommend installing the more modern Jitendex for English users.
 - [JMnedict](https://github.com/themoeway/jmdict-yomitan#jmnedict-for-yomitan) - JMnedict is a dictionary that lists readings of person/place/organization names and other proper nouns.
 - [KANJIDIC](https://github.com/themoeway/jmdict-yomitan#kanjidic-for-yomitan) - KANJIDIC is an English dictionary listing readings, meanings, and other info about kanji characters.
+- [BCCWJ](https://github.com/toasted-nutbread/yomichan-bccwj-frequency-dictionary/) - The BCCWJ Frequency Dictionary is a frequency list of Japanese words based on the [Balanced Corpus of Contemporary Written Japanese](https://clrd.ninjal.ac.jp/bccwj/en/). This dictionary is rank-based, so the lower the number, the more common the word.
 
 ## Basic Usage
 
