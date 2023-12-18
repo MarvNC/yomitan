@@ -5,41 +5,62 @@
     "description": "Japanese dictionary with Anki integration",
     "icons": [
         {
-            "src": "images/icon16.png",
+            "src": "/images/icon16.png",
             "type": "image/png",
             "sizes": "16x16"
         },
         {
-            "src": "images/icon19.png",
+            "src": "/images/icon19.png",
             "type": "image/png",
             "sizes": "19x19"
         },
         {
-            "src": "images/icon32.png",
+            "src": "/images/icon32.png",
             "type": "image/png",
             "sizes": "32x32"
         },
         {
-            "src": "images/icon38.png",
+            "src": "/images/icon38.png",
             "type": "image/png",
             "sizes": "38x38"
         },
         {
-            "src": "images/icon48.png",
+            "src": "/images/icon48.png",
             "type": "image/png",
             "sizes": "48x48"
         },
         {
-            "src": "images/icon64.png",
+            "src": "/images/icon64.png",
             "type": "image/png",
             "sizes": "64x64"
         },
         {
-            "src": "images/icon128.png",
+            "src": "/images/icon128.png",
             "type": "image/png",
             "sizes": "128x128"
+        },
+        {
+            "src": "/images/icon256.png",
+            "type": "image/png",
+            "sizes": "256x256"
         }
     ],
     "background_color": "#BC00FF",
-    "display": "fullscreen"
+    "start_url": "./search.html",
+    "id": "/search.html",
+    "display": "fullscreen",
+    "screenshots": [
+        {
+          "src": "/images/search-popup-kanji.png",
+          "type": "image/png",
+          "sizes": "540x720",
+          "form_factor": "narrow"
+        },
+        {
+          "src": "/images/search-popup-kanji.png",
+          "type": "image/jpg",
+          "sizes": "720x540",
+          "form_factor": "wide"
+        }
+      ]
 }
