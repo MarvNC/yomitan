@@ -1,0 +1,45 @@
+{
+    "$schema": "https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/web-manifest.json",
+    "short_name": "Yomitan",
+    "name": "Yomitan",
+    "description": "Japanese dictionary with Anki integration",
+    "icons": [
+        {
+            "src": "images/icon16.png",
+            "type": "image/png",
+            "sizes": "16x16"
+        },
+        {
+            "src": "images/icon19.png",
+            "type": "image/png",
+            "sizes": "19x19"
+        },
+        {
+            "src": "images/icon32.png",
+            "type": "image/png",
+            "sizes": "32x32"
+        },
+        {
+            "src": "images/icon38.png",
+            "type": "image/png",
+            "sizes": "38x38"
+        },
+        {
+            "src": "images/icon48.png",
+            "type": "image/png",
+            "sizes": "48x48"
+        },
+        {
+            "src": "images/icon64.png",
+            "type": "image/png",
+            "sizes": "64x64"
+        },
+        {
+            "src": "images/icon128.png",
+            "type": "image/png",
+            "sizes": "128x128"
+        }
+    ],
+    "background_color": "#BC00FF",
+    "display": "fullscreen"
+}
