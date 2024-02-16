@@ -73,6 +73,8 @@ export class DictionaryImporter {
             }
         });
 
+        const initialTime = Date.now();
+
         // Read archive
         const zipFileReader = new Uint8ArrayReader(new Uint8Array(archiveContent));
         const zipReader = new ZipReader(zipFileReader);
@@ -223,6 +225,13 @@ export class DictionaryImporter {
         await bulkAdd('media', media);
 
         this._progress();
+
+        const duration = Date.now() - initialTime;
+        const hours = Math.floor(duration / 3600000).toString().padStart(2, '0');
+        const minutes = Math.floor((duration % 3600000) / 60000).toString().padStart(2, '0');
+        const seconds = Math.floor((duration % 60000) / 1000).toString().padStart(2, '0');
+        const milliseconds = (duration % 1000).toString().padStart(3, '0');
+        console.log(`Imported dictionary '${dictionaryTitle}' in ${hours}:${minutes}:${seconds}.${milliseconds}`);
 
         return {result: summary, errors};
     }
