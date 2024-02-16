@@ -231,6 +231,7 @@ export class DictionaryImporter {
         const minutes = Math.floor((duration % 3600000) / 60000).toString().padStart(2, '0');
         const seconds = Math.floor((duration % 60000) / 1000).toString().padStart(2, '0');
         const milliseconds = (duration % 1000).toString().padStart(3, '0');
+        // eslint-disable-next-line no-console
         console.log(`Imported dictionary '${dictionaryTitle}' in ${hours}:${minutes}:${seconds}.${milliseconds}`);
 
         return {result: summary, errors};
