@@ -491,18 +491,19 @@ export class AnkiNoteBuilder {
                 const track = stream.getAudioTracks()[0];
                 if (!track) { throw 'System audio not available'; }
 
-                for (const track of stream.getVideoTracks()) { track.stop(); }
+                for (const videoTrack of stream.getVideoTracks()) { videoTrack.stop(); }
 
                 const mediaStream = new MediaStream();
                 mediaStream.addTrack(track);
 
+                /** @type{BlobPart[]} */
                 const chunks = [];
                 const mediaRecorder = new MediaRecorder(mediaStream, {bitsPerSecond: 128000});
                 mediaRecorder.ondataavailable = (event) => {
                     if (event.data.size > 0) { chunks.push(event.data); }
                 };
                 mediaRecorder.onstop = () => {
-                    for (const track of stream.getTracks()) { track.stop(); }
+                    for (const mediaTrack of stream.getTracks()) { mediaTrack.stop(); }
                     mediaStream.removeTrack(track);
                     resolve(new Blob(chunks));
                 };
