@@ -26,8 +26,9 @@ export class AnkiNoteBuilder {
      * Initiate an instance of AnkiNoteBuilder.
      * @param {import('anki-note-builder').MinimalApi} api
      * @param {import('../templates/template-renderer-proxy.js').TemplateRendererProxy|import('../templates/template-renderer.js').TemplateRenderer} templateRenderer
+     * @param {import('../display/display-audio.js').DisplayAudio} displayAudio
      */
-    constructor(api, templateRenderer) {
+    constructor(api, templateRenderer, displayAudio) {
         /** @type {import('anki-note-builder').MinimalApi} */
         this._api = api;
         /** @type {RegExp} */
@@ -38,6 +39,8 @@ export class AnkiNoteBuilder {
         this._batchedRequests = [];
         /** @type {boolean} */
         this._batchedRequestsQueued = false;
+        /** @type {import('../display/display-audio.js').DisplayAudio} */
+        this._displayAudio = displayAudio;
     }
 
     /**
@@ -441,6 +444,10 @@ export class AnkiNoteBuilder {
             dictionaryMediaDetails
         );
         const {audioFileName, screenshotFileName, clipboardImageFileName, clipboardText, dictionaryMedia: dictionaryMediaArray, errors} = injectedMedia;
+        if (!audioFileName && audioDetails !== null) {
+            // @ts-expect-error - dsa
+            await this._downloadTTS(dictionaryEntryDetails.term, audioDetails);
+        }
         const textFurigana = textFuriganaPromise !== null ? await textFuriganaPromise : [];
 
         // Format results
@@ -465,6 +472,56 @@ export class AnkiNoteBuilder {
             dictionaryMedia
         };
         return {media, errors};
+    }
+
+    /**
+     *
+     * @param {string} text
+     * @param {import('api').InjectAnkiNoteMediaAudioDetails} audioDetails
+     */
+    async _downloadTTS(text, audioDetails) {
+        try {
+            const {sources, preferredAudioIndex, idleTimeout} = audioDetails;
+            // eslint-disable-next-line no-underscore-dangle
+            const audio = this._displayAudio._audioSystem.createTextToSpeechAudio(text, sources[0].voice);
+
+            const blob = await new Promise(async (resolve) => {
+                console.log('picking system audio');
+                const stream = await navigator.mediaDevices.getDisplayMedia({video: true, audio: true});
+                const track = stream.getAudioTracks()[0];
+                if (!track) { throw 'System audio not available'; }
+
+                for (const track of stream.getVideoTracks()) { track.stop(); }
+
+                const mediaStream = new MediaStream();
+                mediaStream.addTrack(track);
+
+                const chunks = [];
+                const mediaRecorder = new MediaRecorder(mediaStream, {bitsPerSecond: 128000});
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) { chunks.push(event.data); }
+                };
+                mediaRecorder.onstop = () => {
+                    for (const track of stream.getTracks()) { track.stop(); }
+                    mediaStream.removeTrack(track);
+                    resolve(new Blob(chunks));
+                };
+                mediaRecorder.start();
+
+                // Play the audio and stop the MediaRecorder after 2 seconds
+                await audio.play();
+                setTimeout(() => mediaRecorder.stop(), 2000);
+            });
+
+            console.log('audio available', blob);
+
+            const player = new Audio();
+            player.src = URL.createObjectURL(blob);
+            player.autoplay = true;
+            player.controls = true;
+        } catch (error) {
+            console.error(error);
+        }
     }
 
     /**

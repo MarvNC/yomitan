@@ -790,14 +790,9 @@ export class DisplayAudio {
      * @param {import('settings').AudioSourceType} source
      * @returns {boolean}
      */
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _sourceIsDownloadable(source) {
-        switch (source) {
-            case 'text-to-speech':
-            case 'text-to-speech-reading':
-                return false;
-            default:
-                return true;
-        }
+        return true;
     }
 
     /**

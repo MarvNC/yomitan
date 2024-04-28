@@ -41,7 +41,7 @@ export class DisplayAnki {
         /** @type {?string} */
         this._ankiFieldTemplatesDefault = null;
         /** @type {AnkiNoteBuilder} */
-        this._ankiNoteBuilder = new AnkiNoteBuilder(display.application.api, new TemplateRendererProxy());
+        this._ankiNoteBuilder = new AnkiNoteBuilder(display.application.api, new TemplateRendererProxy(), displayAudio);
         /** @type {?import('./display-notification.js').DisplayNotification} */
         this._errorNotification = null;
         /** @type {?EventListenerCollection} */
