@@ -101,5 +101,6 @@ jobs:
 
           #   <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}#artifacts">View Playwright Report</a> (note: open the "playwright-report" artifact)
           # todo
+          # test
           # TODO: uncomment
           # update-only: true
