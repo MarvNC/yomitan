@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2020-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -22,6 +22,7 @@ import {EventListenerCollection} from '../core/event-listener-collection.js';
 import {ExtensionError} from '../core/extension-error.js';
 import {parseJson} from '../core/json.js';
 import {log} from '../core/log.js';
+import {safePerformance} from '../core/safe-performance.js';
 
 /**
  * @augments EventDispatcher<import('cross-frame-api').CrossFrameAPIPortEvents>
@@ -68,6 +69,8 @@ export class CrossFrameAPIPort extends EventDispatcher {
         if (this._port === null) { throw new Error('Invalid state'); }
         this._eventListeners.addListener(this._port.onDisconnect, this._onDisconnect.bind(this));
         this._eventListeners.addListener(this._port.onMessage, this._onMessage.bind(this));
+        this._eventListeners.addEventListener(window, 'pageshow', this._onPageShow.bind(this));
+        this._eventListeners.addEventListener(document, 'resume', this._onResume.bind(this));
     }
 
     /**
@@ -106,7 +109,7 @@ export class CrossFrameAPIPort extends EventDispatcher {
                     return;
                 }
             }
-
+            safePerformance.mark(`cross-frame-api:invoke:${action}`);
             try {
                 this._port.postMessage(/** @type {import('cross-frame-api').InvokeMessage} */ ({type: 'invoke', id, data: {action, params}}));
             } catch (e) {
@@ -121,6 +124,26 @@ export class CrossFrameAPIPort extends EventDispatcher {
     }
 
     // Private
+
+    /**
+     * @param {Event} e
+     */
+    _onResume(e) {
+        // Page Resumed after being frozen
+        log.log('Yomitan cross frame reset. Resuming after page frozen.', e);
+        this._onDisconnect();
+    }
+
+    /**
+     * @param {PageTransitionEvent} e
+     */
+    _onPageShow(e) {
+        // Page restored from BFCache
+        if (e.persisted) {
+            log.log('Yomitan cross frame reset. Page restored from BFCache.', e);
+            this._onDisconnect();
+        }
+    }
 
     /** */
     _onDisconnect() {

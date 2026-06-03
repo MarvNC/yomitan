@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2020-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -191,14 +191,20 @@ async function build(buildDir, extDir, manifestUtil, variantNames, manifestPath,
                 fs.writeFileSync(manifestPath, ManifestUtil.createManifestString(modifiedManifest).replace('$YOMITAN_VERSION', yomitanVersion));
             }
 
-            if (!dryRun || dryRunBuildZip) {
-                await createZip(extDir, excludeFiles, fullFileName, sevenZipExes, onUpdate, dryRun);
-            }
+            if (fileName.endsWith('.zip')) {
+                if (!dryRun || dryRunBuildZip) {
+                    await createZip(extDir, excludeFiles, fullFileName, sevenZipExes, onUpdate, dryRun);
+                }
 
-            if (!dryRun && Array.isArray(fileCopies)) {
-                for (const fileName2 of fileCopies) {
-                    const fileName2Safe = path.basename(fileName2);
-                    fs.copyFileSync(fullFileName, path.join(buildDir, fileName2Safe));
+                if (!dryRun && Array.isArray(fileCopies)) {
+                    for (const fileName2 of fileCopies) {
+                        const fileName2Safe = path.basename(fileName2);
+                        fs.copyFileSync(fullFileName, path.join(buildDir, fileName2Safe));
+                    }
+                }
+            } else {
+                if (!dryRun) {
+                    fs.cpSync(extDir, fullFileName, {recursive: true});
                 }
             }
         }
@@ -244,6 +250,9 @@ export async function main() {
             type: 'string',
             default: '0.0.0.0',
         },
+        target: {
+            type: 'string',
+        },
     };
 
     const argv = process.argv.slice(2);
@@ -263,9 +272,11 @@ export async function main() {
     try {
         await buildLibs();
         const variantNames = /** @type {string[]} */ ((
-            argv.length === 0 || args.all ?
+            args.target ?
+            [args.target] :
+            (argv.length === 0 || args.all ?
             manifestUtil.getVariants().filter(({buildable}) => buildable !== false).map(({name}) => name) :
-            targets
+            targets)
         ));
         await build(buildDir, extDir, manifestUtil, variantNames, manifestPath, dryRun, dryRunBuildZip, yomitanVersion);
     } finally {

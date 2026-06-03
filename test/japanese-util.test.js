@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2020-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -159,6 +159,41 @@ describe('Japanese utility functions', () => {
         });
     });
 
+    describe('convertToKanaIME', () => {
+        /** @type {[input: [string, number], expected: import('language.js').KanaIMEOutput][]} */
+        const data = [
+            // Note: `|` represents the text cursor (newSelectionStart) position in the following comments
+            // hiragana
+            [['hiragana', 8], {kanaString: 'ひらがな', newSelectionStart: 4}], // hiragana| -> ひらがな|
+            [['n', 1], {kanaString: 'n', newSelectionStart: 1}], // n| -> n|
+            [['nn', 2], {kanaString: 'ん', newSelectionStart: 1}], // nn| -> ん|
+            [['nn', 1], {kanaString: 'nん', newSelectionStart: 1}], // n|n -> n|ん
+            [['nの', 1], {kanaString: 'nの', newSelectionStart: 1}], // n|の -> n|の
+            [['nnn', 3], {kanaString: 'んn', newSelectionStart: 2}], // nnn| -> んn|
+            [['nnnnano', 7], {kanaString: 'んんあの', newSelectionStart: 4}], // nnnnano| -> んんあの|
+            [['ny', 2], {kanaString: 'ny', newSelectionStart: 2}], // ny| -> ny|
+            [['nya', 3], {kanaString: 'にゃ', newSelectionStart: 2}], // nya| -> にゃ|
+            [['ttttttttttsu', 12], {kanaString: 'っっっっっっっっっつ', newSelectionStart: 10}], // ttttttttttsu| -> っっっっっっっっっつ|
+            [['tt', 2], {kanaString: 'っt', newSelectionStart: 2}], // tt| -> っt|
+            // Katakana
+            [['KATAKANA', 8], {kanaString: 'カタカナ', newSelectionStart: 4}], // KATAKANA| -> カタカナ|
+            [['N', 1], {kanaString: 'N', newSelectionStart: 1}], // N| -> N|
+            [['NN', 2], {kanaString: 'ン', newSelectionStart: 1}], // NN| -> ン|
+            [['NN', 1], {kanaString: 'Nン', newSelectionStart: 1}], // N|N -> N|ン
+            [['Nノ', 1], {kanaString: 'Nノ', newSelectionStart: 1}], // N|ノ -> N|ノ
+            [['NNN', 3], {kanaString: 'ンN', newSelectionStart: 2}], // NNN| -> ンN|
+            [['NNNNANO', 7], {kanaString: 'ンンアノ', newSelectionStart: 4}], // NNNNANO| -> ンンアノ|
+            [['NY', 2], {kanaString: 'NY', newSelectionStart: 2}], // NY| -> NY|
+            [['NYA', 3], {kanaString: 'ニャ', newSelectionStart: 2}], // NYA| -> ニャ|
+            [['TTTTTTTTTTSU', 12], {kanaString: 'ッッッッッッッッッツ', newSelectionStart: 10}], // TTTTTTTTTTSU| -> ッッッッッッッッッツ|
+            [['TT', 2], {kanaString: 'ッT', newSelectionStart: 2}], // TT| -> ッT|
+        ];
+
+        test.each(data)('%s -> %o', (dataValue, expected) => {
+            expect(jpw.convertToKanaIME(dataValue[0], dataValue[1])).toStrictEqual(expected);
+        });
+    });
+
     describe('convertToRomaji', () => {
         /** @type {[string: string, expected: string][]} */
         const data = [
@@ -168,9 +203,13 @@ describe('Japanese utility functions', () => {
             ['ヒラガナ', 'hiragana'],
             ['カタカナかたかな', 'katakanakatakana'],
             ['ヒラガナひらがな', 'hiraganahiragana'],
+            ['っかっきっくっけっこ', 'kkakkikkukkekko'],
+            ['ッカッキックッケッコ', 'kkakkikkukkekko'],
             ['chikaraちからチカラ力', 'chikarachikarachikara力'],
             ['katakana', 'katakana'],
             ['hiragana', 'hiragana'],
+            ['っつ', 'ttsu'],
+            ['っっっっっっっっっつ', 'ttsu'],
         ];
 
         test.each(data)('%s -> %o', (string, expected) => {
@@ -1065,5 +1104,163 @@ describe('combining dakuten/handakuten normalization', () => {
     const testCases = [...testCasesDakuten, ...testCasesHandakuten, ...testCasesIgnored, ...textCasesMisc];
     test.each(testCases)('%s normalizes to %s', (input, expected) => {
         expect(jp.normalizeCombiningCharacters(input)).toStrictEqual(expected);
+    });
+});
+
+describe('cjk compatibility characters normalization', () => {
+    const testCases = [
+        ['㌀', 'アパート'],
+        ['㌁', 'アルファ'],
+        ['㌂', 'アンペア'],
+        ['㌃', 'アール'],
+        ['㌄', 'イニング'],
+        ['㌅', 'インチ'],
+        ['㌆', 'ウォン'],
+        ['㌇', 'エスクード'],
+        ['㌈', 'エーカー'],
+        ['㌉', 'オンス'],
+        ['㌊', 'オーム'],
+        ['㌋', 'カイリ'],
+        ['㌌', 'カラット'],
+        ['㌍', 'カロリー'],
+        ['㌎', 'ガロン'],
+        ['㌏', 'ガンマ'],
+        ['㌐', 'ギガ'],
+        ['㌑', 'ギニー'],
+        ['㌒', 'キュリー'],
+        ['㌓', 'ギルダー'],
+        ['㌔', 'キロ'],
+        ['㌕', 'キログラム'],
+        ['㌖', 'キロメートル'],
+        ['㌗', 'キロワット'],
+        ['㌘', 'グラム'],
+        ['㌙', 'グラムトン'],
+        ['㌚', 'クルゼイロ'],
+        ['㌛', 'クローネ'],
+        ['㌜', 'ケース'],
+        ['㌝', 'コルナ'],
+        ['㌞', 'コーポ'],
+        ['㌟', 'サイクル'],
+        ['㌠', 'サンチーム'],
+        ['㌡', 'シリング'],
+        ['㌢', 'センチ'],
+        ['㌣', 'セント'],
+        ['㌤', 'ダース'],
+        ['㌥', 'デシ'],
+        ['㌦', 'ドル'],
+        ['㌧', 'トン'],
+        ['㌨', 'ナノ'],
+        ['㌩', 'ノット'],
+        ['㌪', 'ハイツ'],
+        ['㌫', 'パーセント'],
+        ['㌬', 'パーツ'],
+        ['㌭', 'バーレル'],
+        ['㌮', 'ピアストル'],
+        ['㌯', 'ピクル'],
+        ['㌰', 'ピコ'],
+        ['㌱', 'ビル'],
+        ['㌲', 'ファラッド'],
+        ['㌳', 'フィート'],
+        ['㌴', 'ブッシェル'],
+        ['㌵', 'フラン'],
+        ['㌶', 'ヘクタール'],
+        ['㌷', 'ペソ'],
+        ['㌸', 'ペニヒ'],
+        ['㌹', 'ヘルツ'],
+        ['㌺', 'ペンス'],
+        ['㌻', 'ページ'],
+        ['㌼', 'ベータ'],
+        ['㌽', 'ポイント'],
+        ['㌾', 'ボルト'],
+        ['㌿', 'ホン'],
+        ['㍀', 'ポンド'],
+        ['㍁', 'ホール'],
+        ['㍂', 'ホーン'],
+        ['㍃', 'マイクロ'],
+        ['㍄', 'マイル'],
+        ['㍅', 'マッハ'],
+        ['㍆', 'マルク'],
+        ['㍇', 'マンション'],
+        ['㍈', 'ミクロン'],
+        ['㍉', 'ミリ'],
+        ['㍊', 'ミリバール'],
+        ['㍋', 'メガ'],
+        ['㍌', 'メガトン'],
+        ['㍍', 'メートル'],
+        ['㍎', 'ヤード'],
+        ['㍏', 'ヤール'],
+        ['㍐', 'ユアン'],
+        ['㍑', 'リットル'],
+        ['㍒', 'リラ'],
+        ['㍓', 'ルピー'],
+        ['㍔', 'ルーブル'],
+        ['㍕', 'レム'],
+        ['㍖', 'レントゲン'],
+        ['㍗', 'ワット'],
+        ['㍘', '0点'],
+        ['㍙', '1点'],
+        ['㍚', '2点'],
+        ['㍛', '3点'],
+        ['㍜', '4点'],
+        ['㍝', '5点'],
+        ['㍞', '6点'],
+        ['㍟', '7点'],
+        ['㍠', '8点'],
+        ['㍡', '9点'],
+        ['㍢', '10点'],
+        ['㍣', '11点'],
+        ['㍤', '12点'],
+        ['㍥', '13点'],
+        ['㍦', '14点'],
+        ['㍧', '15点'],
+        ['㍨', '16点'],
+        ['㍩', '17点'],
+        ['㍪', '18点'],
+        ['㍫', '19点'],
+        ['㍬', '20点'],
+        ['㍭', '21点'],
+        ['㍮', '22点'],
+        ['㍯', '23点'],
+        ['㍰', '24点'],
+        ['㍻', '平成'],
+        ['㍼', '昭和'],
+        ['㍽', '大正'],
+        ['㍾', '明治'],
+        ['㍿', '株式会社'],
+        ['㏠', '1日'],
+        ['㏡', '2日'],
+        ['㏢', '3日'],
+        ['㏣', '4日'],
+        ['㏤', '5日'],
+        ['㏥', '6日'],
+        ['㏦', '7日'],
+        ['㏧', '8日'],
+        ['㏨', '9日'],
+        ['㏩', '10日'],
+        ['㏪', '11日'],
+        ['㏫', '12日'],
+        ['㏬', '13日'],
+        ['㏭', '14日'],
+        ['㏮', '15日'],
+        ['㏯', '16日'],
+        ['㏰', '17日'],
+        ['㏱', '18日'],
+        ['㏲', '19日'],
+        ['㏳', '20日'],
+        ['㏴', '21日'],
+        ['㏵', '22日'],
+        ['㏶', '23日'],
+        ['㏷', '24日'],
+        ['㏸', '25日'],
+        ['㏹', '26日'],
+        ['㏺', '27日'],
+        ['㏻', '28日'],
+        ['㏼', '29日'],
+        ['㏽', '30日'],
+        ['㏾', '31日'],
+    ];
+
+    test.each(testCases)('%s normalizes to %s', (input, expected) => {
+        expect(jp.normalizeCJKCompatibilityCharacters(input)).toStrictEqual(expected);
     });
 });

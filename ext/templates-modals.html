@@ -11,7 +11,7 @@
                 </div>
             </div>
         </div>
-        <div class="modal-body">
+        <div id="dictionaries-modal-body" class="modal-body">
             <div class="settings-item">
                 <div class="settings-item-inner">
                     <div class="settings-item-left">
@@ -50,7 +50,6 @@
                 <div class="dictionary-item-top"></div>
                 <label class="dictionary-item-top toggle dictionary-item-enabled-toggle-container"><input type="checkbox" id="all-dictionaries-enabled"><span class="toggle-body"><span class="toggle-track"></span><span class="toggle-knob"></span></span></label>
                 <div class="dictionary-item-top dictionary-item-title-container">All</div>
-                <div class="dictionary-item-top advanced-only">Priority</div>
                 <div class="dictionary-item-top dictionary-item-button-height"></div>
                 <div class="dictionary-item-top dictionary-item-button-height"></div>
                 <div class="dictionary-item-top dictionary-item-button-height"></div>
@@ -68,7 +67,7 @@
         </div>
         <div class="modal-footer">
             <button type="button" class="low-emphasis danger dictionary-database-mutating-input" id="dictionary-delete-all-button">Delete All</button>
-            <button type="button" class="low-emphasis dictionary-database-mutating-input debug-only" id="dictionary-check-integrity">Check Integrity</button>
+            <button type="button" class="low-emphasis dictionary-database-mutating-input advanced-only" id="dictionary-check-integrity">Check Integrity</button>
             <button type="button" class="low-emphasis dictionary-database-mutating-input" id="dictionary-check-updates">Check for Updates</button>
             <button type="button" class="low-emphasis dictionary-database-mutating-input" id="dictionary-import-button">Import</button>
             <button type="button" data-modal-action="hide">Close</button>
@@ -104,6 +103,8 @@
         <div class="modal-body">
             <p>Are you sure you want to delete the dictionary:</p>
             <p><strong id="dictionary-confirm-delete-name"></strong>?</p>
+            <p id="dictionary-confirm-delete-used-profiles-text">This dictionary is currently used by the following profiles:</p>
+            <ul id="dictionary-confirm-delete-used-profiles"></ul>
             <p class="danger-text">This action cannot be undone.</p>
         </div>
         <div class="modal-footer">
@@ -232,7 +233,6 @@
             <hr>
             <div class="settings-item"><div class="settings-item-children">
                 <div class="dictionary-details-table"></div>
-                <div class="dictionary-counts"></div>
             </div></div>
         </div>
         <div class="modal-footer">
@@ -251,7 +251,9 @@
                 The database contains extra data which is not associated with any installed dictionary.
                 Purging the database can fix this issue.
             </p>
-            <div class="dictionary-counts"></div>
+            <div class="settings-item"><div class="settings-item-children">
+                <div class="dictionary-details-table"></div>
+            </div></div>
         </div>
         <div class="modal-footer">
             <button type="button" data-modal-action="hide">Close</button>
@@ -300,7 +302,7 @@
         <div class="modal-body">
             <p>
                 For non-English dictionaries, please refer to the list of available
-                <a href="https://github.com/yomidevs/kaikki-to-yomitan/blob/master/downloads.md#downloads" target="_blank"> Kaikki dictionaries</a>.
+                <a href="https://yomidevs.github.io/wiktionary-to-yomitan/download/" target="_blank"> Wiktionary dictionaries</a>.
             </p>
             <div id="recommended-term-dictionaries" hidden>
                 <h1 class="modal-title">Term Dictionaries</h1>
@@ -333,6 +335,30 @@
         </div>
         <div class="modal-footer">
             <button type="button" data-modal-action="hide">Close</button>
+        </div>
+    </div></div>
+
+    <!-- Recommended settings modal -->
+    <div id="recommended-settings-modal" class="modal" tabindex="-1" role="dialog" hidden><div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">Recommended settings</div>
+        </div>
+        <div class="modal-body">
+            <span>We recommend the following settings for your selected language</span>
+            <div id="recommended-settings-body">
+                <div class="settings-item">
+                    <div class="settings-item-inner">
+                        <div class="settings-item-left">
+                            <div class="settings-item-label"><strong>Recommendations</strong></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="recommended-settings-list"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="low-emphasis" data-modal-action="hide">Cancel</button>
+            <button type="button" id="recommended-settings-apply-button">Apply</button>
         </div>
     </div></div>
 </template>
@@ -401,6 +427,10 @@
                         If no conditions are specified, the profile will only be used if it is selected as the default profile.
                     </p>
                     <p>
+                        When using the Flags condition, <code>clipboard</code> is the only valid input.
+                        This lets the search page apply another profile’s settings when text is copied, provided <code>Enable search page clipboard text monitoring</code> is enabled.
+                    </p>
+                    <p>
                         <a tabindex="0" class="more-toggle" data-parent-distance="3">Hide&hellip;</a>
                     </p>
                 </div>
@@ -434,6 +464,19 @@
         <div class="modal-footer">
             <button type="button" class="low-emphasis" data-modal-action="hide">Cancel</button>
             <button type="button" id="profile-copy-confirm-button">Copy Profile</button>
+        </div>
+    </div></div>
+
+    <div id="profile-reset-modal" class="modal" tabindex="-1" role="dialog" hidden><div class="modal-content modal-content-small">
+        <div class="modal-header"><div class="modal-title">Confirm Profile Reset</div></div>
+        <div class="modal-body">
+            <p>
+                Are you sure you want to reset the profile <em id="profile-reset-name"></em> to default?
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="low-emphasis" data-modal-action="hide">Cancel</button>
+            <button type="button" class="danger" id="profile-reset-confirm-button">Reset Profile</button>
         </div>
     </div></div>
 
@@ -524,20 +567,30 @@
                 the value can be a unitless integer or decimal number.
             </p>
             <div class="code margin-above">/* Globally set the line count */
-    :root {
-        --collapsible-definition-line-count: 2;
-    }
+:root {
+    --collapsible-definition-line-count: 2;
+}
+:root {
+    --collapsible-kanji-glyph-data-line-count: 2;
+}
 
-    /* Set the line count for a specific dictionary */
-    .definition-item[data-dictionary='JMdict'] {
-        --collapsible-definition-line-count: 2;
-    }
+/* Set the line count for a specific dictionary */
+.definition-item[data-dictionary='JMdict'] {
+    --collapsible-definition-line-count: 2;
+}
+.kanji-entry[data-dictionary='KANJIDIC'] {
+    --collapsible-kanji-glyph-data-line-count: 2;
+}
 
-    /* Spoiler-like functionality, use with <em>Force collapsed</em> mode */
-    .definition-item[data-dictionary='JMdict'] .definition-item-inner.collapsible.collapsed {
-        color: #000000;
-        background-color: #000000;
-    }
+/* Spoiler-like functionality, use with <em>Force collapsed</em> mode */
+.definition-item[data-dictionary='JMdict'] .definition-item-inner.collapsible.collapsed {
+    color: #000000;
+    background-color: #000000;
+}
+.kanji-entry[data-dictionary='KANJIDIC'] .kanji-glyph-data.collapsible.collapsed {
+    color: #000000;
+    background-color: #000000;
+}
     </div>
         </div>
         <div class="modal-footer">
@@ -588,6 +641,17 @@
             <div class="settings-item">
                 <div class="settings-item-inner">
                     <div class="settings-item-left">
+                        <div class="settings-item-label">Enable Default Audio Sources</div>
+                        <div class="settings-item-description" id="default-audio-sources-settings-list"></div>
+                    </div>
+                    <div class="settings-item-right">
+                        <label class="toggle"><input type="checkbox" data-setting="audio.enableDefaultAudioSources"><span class="toggle-body"><span class="toggle-track"></span><span class="toggle-knob"></span></span></label>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-item">
+                <div class="settings-item-inner">
+                    <div class="settings-item-left">
                         <div class="settings-item-label">
                             When searching for audio, the sources are checked in order until the first
                             valid source is found. This allows for selecting a fallback source if the
@@ -615,9 +679,10 @@
         </div>
         <div class="modal-body">
             <p>
-                A custom URL can be used to play audio from any URL.
+                A custom URL can be used to play audio from any URL.<br>
                 The replacement tags <code data-select-on-click="">{term}</code> and <code data-select-on-click="">{reading}</code>
                 can be used to specify which term and reading is being looked up.<br>
+                <code data-select-on-click="">{language}</code> is also available for sources that require an iso language string.<br>
             </p>
             <p>
                 Example:<br>
@@ -639,6 +704,11 @@
                 The format of the JSON file is described in <a href="/data/schemas/custom-audio-list-schema.json" target="_blank" rel="noopener noreferrer">this schema file</a>.
             </p>
             <p>
+                The replacement tags <code data-select-on-click="">{term}</code> and <code data-select-on-click="">{reading}</code>
+                can be used to specify which term and reading is being looked up.<br>
+                <code data-select-on-click="">{language}</code> is also available for sources that require an iso language string.<br>
+            </p>
+            <p>
                 Example:<br>
                 <a tabindex="0" data-select-on-click="">http://localhost/audio.json?term={term}&amp;reading={reading}</a>
             </p>
@@ -656,6 +726,9 @@
             <p>
                 A synthesized voice will speak the given text, using either the term text or the reading.
             </p>
+            <p class="warning-text">
+                ⚠️ Note: Audio generated with text-to-speech cannot be captured for use in Anki card creation.
+            </p>
             <div class="horizontal-flex margin-above">
                 <input type="text" value="よみたん" id="text-to-speech-voice-test-text" autocomplete="off" lang="ja">
                 <button type="button" id="text-to-speech-voice-test">Test</button>
@@ -663,6 +736,20 @@
         </div>
         <div class="modal-footer">
             <button type="button" data-modal-action="hide">Close</button>
+        </div>
+    </div></div>
+
+    <div id="audio-source-move-location-modal" class="modal" tabindex="-1" role="dialog" hidden><div class="modal-content modal-content-small">
+        <div class="modal-header"><div class="modal-title">Move Audio Source Options</div></div>
+        <div class="modal-body">
+            <p>Input the location the audio source should be moved to:</p>
+            <div class="margin-above">
+                <input type="number" id="audio-source-move-location" min="1" step="1">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="low-emphasis" data-modal-action="hide">Cancel</button>
+            <button type="button" data-modal-action="hide" id="audio-source-move-button">Move</button>
         </div>
     </div></div>
 
@@ -730,20 +817,26 @@
         <div class="modal-header"><div class="modal-title">Input Action Prevention</div></div>
         <div class="modal-body">
             <div>
-                Prevent middle mouse button actions on:
+                Prevent secondary mouse button actions on:
                 <a tabindex="0" class="more-toggle more-only" data-parent-distance="2">(?)</a>
             </div>
             <div class="more" hidden>
                 <p>
-                    This option is used to disable the default action of the middle mouse button in different contexts.
-                    This can be useful for preventing the scroll action that the middle mouse button is typically mapped to,
-                    which is otherwise difficult to disable inside extension pages via other means.
+                    This option is used to disable the default action of the secondary mouse buttons in different contexts.
+                    This can be useful for preventing actions that the middle button and buttons 4 and 5 are typically
+                    mapped to (scrolling and back/forward, respectively), which are otherwise difficult to disable inside
+                    extension pages via other means.
                 </p>
                 <p>
                     <a tabindex="0" class="more-toggle" data-parent-distance="3">Less&hellip;</a>
                 </p>
             </div>
             <div class="input-prevention-option-list">
+                Middle mouse button:
+                <label class="input-prevention-option-list-item">
+                    <label class="checkbox"><input type="checkbox" data-setting="scanning.preventMiddleMouse.onTextHover"><span class="checkbox-body"><span class="checkbox-fill"></span><span class="checkbox-border"></span><span class="checkbox-check"></span></span></label>
+                    <span>Text Hover</span>
+                </label>
                 <label class="input-prevention-option-list-item">
                     <label class="checkbox"><input type="checkbox" data-setting="scanning.preventMiddleMouse.onWebPages"><span class="checkbox-body"><span class="checkbox-fill"></span><span class="checkbox-border"></span><span class="checkbox-check"></span></span></label>
                     <span>Webpages</span>
@@ -761,6 +854,29 @@
                     <span>Search query</span>
                 </label>
             </div>
+            <div class="input-prevention-option-list">
+                Back/forward mouse buttons:
+                <label class="input-prevention-option-list-item">
+                    <label class="checkbox"><input type="checkbox" data-setting="scanning.preventBackForward.onTextHover"><span class="checkbox-body"><span class="checkbox-fill"></span><span class="checkbox-border"></span><span class="checkbox-check"></span></span></label>
+                    <span>Text Hover</span>
+                </label>
+                <label class="input-prevention-option-list-item">
+                    <label class="checkbox"><input type="checkbox" data-setting="scanning.preventBackForward.onWebPages"><span class="checkbox-body"><span class="checkbox-fill"></span><span class="checkbox-border"></span><span class="checkbox-check"></span></span></label>
+                    <span>Webpages</span>
+                </label>
+                <label class="input-prevention-option-list-item">
+                    <label class="checkbox"><input type="checkbox" data-setting="scanning.preventBackForward.onPopupPages"><span class="checkbox-body"><span class="checkbox-fill"></span><span class="checkbox-border"></span><span class="checkbox-check"></span></span></label>
+                    <span>Popups</span>
+                </label>
+                <label class="input-prevention-option-list-item">
+                    <label class="checkbox"><input type="checkbox" data-setting="scanning.preventBackForward.onSearchPages"><span class="checkbox-body"><span class="checkbox-fill"></span><span class="checkbox-border"></span><span class="checkbox-check"></span></span></label>
+                    <span>Search page</span>
+                </label>
+                <label class="input-prevention-option-list-item">
+                    <label class="checkbox"><input type="checkbox" data-setting="scanning.preventBackForward.onSearchQuery"><span class="checkbox-body"><span class="checkbox-fill"></span><span class="checkbox-border"></span><span class="checkbox-check"></span></span></label>
+                    <span>Search query</span>
+                </label>
+            </div>
         </div>
         <div class="modal-footer">
             <button type="button" data-modal-action="hide">Close</button>
@@ -769,35 +885,52 @@
 
 
     <!-- Anki cards modal -->
-    <div id="anki-cards-modal" class="modal" tabindex="-1" role="dialog" hidden><div class="modal-content">
+    <div id="anki-cards-modal" class="modal" tabindex="-1" role="dialog" hidden><div class="modal-content modal-content-full">
         <div class="modal-header">
             <div class="modal-title">Anki Cards</div>
-            <div class="modal-header-button-container">
-                <div class="modal-header-button-group">
-                    <button type="button" class="icon-button modal-header-button" data-modal-action="expand"><span class="icon-button-inner"><span class="icon" data-icon="expand"></span></span></button>
-                    <button type="button" class="icon-button modal-header-button" data-modal-action="collapse"><span class="icon-button-inner"><span class="icon" data-icon="collapse"></span></span></button>
-                </div>
-            </div>
         </div>
         <div>
-            <div class="tabs-container">
-                <div class="tabs">
-                    <label class="tab">
-                        <input type="radio" name="anki-card-primary-type" data-value="terms" data-anki-card-menu="anki-card-terms-field-menu" checked>
-                        <div class="tab-inner"><span class="tab-label">Terms</span></div>
-                    </label>
-                    <label class="tab">
-                        <input type="radio" name="anki-card-primary-type" data-value="kanji" data-anki-card-menu="anki-card-kanji-field-menu">
-                        <div class="tab-inner"><span class="tab-label">Kanji</span></div>
-                    </label>
-                </div>
-                <div class="tabs-right" hidden>
-                    <button type="button" class="icon-button" data-menu-position="below left" id="anki-card-primary-type-menu-button"><span class="icon-button-inner"><span class="icon" data-icon="kebab-menu"></span></span></button>
+            <div class="anki-card-tabs-container">
+                <div class="tabs" id="anki-cards-tabs"></div>
+                <div id="anki-cards-new-format" class="advanced-only">
+                    <button type="button" class="icon-button"><span class="icon-button-inner"><span class="icon" data-icon="plus-thick"></span></span></button>
                 </div>
             </div>
             <div class="modal-separator-line"></div>
         </div>
-        <div class="modal-body anki-card" id="anki-card-primary" data-anki-card-type="terms" data-anki-card-menu="anki-card-terms-field-menu">
+        <div class="modal-body anki-card" id="anki-card-primary" data-card-format-index="0" data-anki-card-menu="anki-card-term-field-menu">
+            <div class="settings-item advanced-only"><div class="settings-item-inner">
+                <div class="settings-item-left">
+                    <div class="settings-item-label">Name</div>
+                </div>
+                <div class="settings-item-right">
+                    <input type="text" class="anki-card-name" data-setting="anki.cardFormats.[0].name">
+                </div>
+            </div></div>
+            <div class="settings-item advanced-only"><div class="settings-item-inner">
+                <div class="settings-item-left">
+                    <div class="settings-item-label">Dictionary Type</div>
+                </div>
+                <div class="settings-item-right">
+                    <select class="anki-card-type">
+                        <option value="term">Term</option>
+                        <option value="kanji">Kanji</option>
+                    </select>
+                </div>
+            </div></div>
+            <div class="settings-item advanced-only"><div class="settings-item-inner">
+                <div class="settings-item-left">
+                    <div class="settings-item-label">Button</div>
+                </div>
+                <div class="settings-item-right">
+                    <select class="anki-card-icon select-icon icon color-icon" data-icon="big-circle">
+                        <option value="big-circle">Big Circle</option>
+                        <option value="small-circle">Small Circle</option>
+                        <option value="big-square">Square</option>
+                        <option value="big-diamond">Diamond</option>
+                    </select>
+                </div>
+            </div></div>
             <div class="settings-item"><div class="settings-item-inner">
                 <div class="settings-item-left">
                     <div class="settings-item-label">Deck</div>
@@ -814,12 +947,15 @@
                     <select class="anki-card-model"></select>
                 </div>
             </div></div>
+            <hr>
             <div class="anki-card-fields">
                 <div class="anki-card-field-name-header" data-persistent="true">Field</div>
                 <div class="anki-card-field-input-header" data-persistent="true">Value</div>
+                <div class="anki-card-field-overwrite-header" data-persistent="true">Overwrite</div>
             </div>
         </div>
         <div class="modal-footer">
+            <button type="button" class="danger anki-card-delete-format-button advanced-only">Delete Format</button>
             <button type="button" class="low-emphasis" data-modal-action="show,anki-cards-info">Help</button>
             <button type="button" data-modal-action="hide">Close</button>
         </div>
@@ -901,6 +1037,14 @@
                         <td>First definition for the term.</td>
                     </tr>
                     <tr>
+                        <td><code class="anki-field-marker">{glossary-plain}</code></td>
+                        <td>List of definitions for the term with html only used for line breaks. This may break the formatting of some dictionaries.</td>
+                    </tr>
+                    <tr>
+                        <td><code class="anki-field-marker">{glossary-plain-no-dictionary}</code></td>
+                        <td><code class="anki-field-marker">{glossary-plain}</code> except the dictionary tag is omitted.</td>
+                    </tr>
+                    <tr>
                         <td><code class="anki-field-marker">{glossary-first-brief}</code></td>
                         <td>First definition for the term in a more compact format.</td>
                     </tr>
@@ -957,6 +1101,18 @@
                         <td><code class="anki-field-marker">{single-glossary-DICT-NAME-no-dictionary}</code></td>
                         <td>
                             See <code class="anki-field-marker">{single-glossary-DICT-NAME}</code> and <code class="anki-field-marker">{glossary-no-dictionary}</code>.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><code class="anki-field-marker">{single-glossary-DICT-NAME-plain}</code></td>
+                        <td>
+                            See <code class="anki-field-marker">{single-glossary-DICT-NAME}</code> and <code class="anki-field-marker">{glossary-plain}</code>.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><code class="anki-field-marker">{single-glossary-DICT-NAME-plain-no-dictionary}</code></td>
+                        <td>
+                            See <code class="anki-field-marker">{single-glossary-DICT-NAME}</code> and <code class="anki-field-marker">{glossary-plain-no-dictionary}</code>.
                         </td>
                     </tr>
                     <tr>
@@ -1066,6 +1222,14 @@
                         </td>
                     </tr>
                     <tr>
+                        <td><code class="anki-field-marker">{single-frequency-DICT-NAME}</code></td>
+                        <td>All frequencies from the selected dictionary put in a list.</td>
+                    </tr>
+                    <tr>
+                        <td><code class="anki-field-marker">{single-frequency-number-DICT-NAME}</code></td>
+                        <td>A single frequency number from the selected dictionary with no formatting data.</td>
+                    </tr>
+                    <tr>
                         <td><code class="anki-field-marker">{screenshot}</code></td>
                         <td>Screenshot of the web page taken at the time the term or kanji was added.</td>
                     </tr>
@@ -1086,6 +1250,10 @@
                         <td>Sentence, quote, or phrase that the term or kanji appears in from the source content, with furigana added.</td>
                     </tr>
                     <tr>
+                        <td><code class="anki-field-marker">{sentence-furigana-plain}</code></td>
+                        <td>Sentence, quote, or phrase that the term or kanji appears in from the source content, with furigana added in brackets.</td>
+                    </tr>
+                    <tr>
                         <td><code class="anki-field-marker">{url}</code></td>
                         <td>Address of the web page in which the term or kanji appeared in.</td>
                     </tr>
@@ -1096,6 +1264,29 @@
             <button type="button" data-modal-action="hide">Close</button>
         </div>
     </div></div>
+
+    <div id="anki-card-format-remove-modal" class="modal" tabindex="-1" role="dialog" hidden><div class="modal-content modal-content-small">
+        <div class="modal-header"><div class="modal-title">Confirm Card Format Deletion</div></div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete the <em id="anki-card-format-remove-name"></em> card format?</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="low-emphasis" data-modal-action="hide">Cancel</button>
+            <button type="button" class="danger" id="anki-card-format-remove-confirm-button">Delete Format</button>
+        </div>
+    </div></div>
+
+    <div id="anki-add-card-format-maximum-modal" class="modal" tabindex="-1" role="dialog" hidden><div class="modal-content modal-content-small">
+        <div class="modal-header"><div class="modal-title">Maximum Card Formats Reached</div></div>
+        <div class="modal-body">
+            <p>The number of card formats is limited to 5.</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="low-emphasis" data-modal-action="hide">Close</button>
+        </div>
+    </div></div>
+
+
 
 
     <!-- Anki field template modals -->
@@ -1169,10 +1360,17 @@
             </div>
             <textarea autocomplete="off" spellcheck="false" id="generate-anki-notes-textarea" class="no-wrap margin-above" data-tab-action="indent,4"></textarea>
             <div class="generate-anki-notes-test-container margin-above">
-                <p>
-                    Active Anki deck: <code id="generate-anki-notes-active-deck"></code><br>
-                    Active Anki model: <code id="generate-anki-notes-active-model"></code>
-                </p>
+                <div id="generate-anki-notes-buttons-wrapper">
+                    <div>
+                        <div>Active Anki Flashcard Format: <select id="generate-anki-flashcard-format"></select></div>
+                        <div>Active Anki deck: <code id="generate-anki-notes-active-deck"></code></div>
+                        <div>Active Anki model: <code id="generate-anki-notes-active-model"></code></div>
+                    </div>
+                    <div>
+                        <button type="button" class="low-emphasis" id="generate-anki-notes-parse-button" title="Split text into a newline separated list of words">Parse Words</button>
+                        <button type="button" class="low-emphasis" id="generate-anki-notes-dedupe-button" title="Remove duplicate lines">Dedupe Words</button>
+                    </div>
+                </div>
                 <div class="generate-anki-notes-test-table margin-above">
                     <div class="generate-anki-notes-test-table-header">Test word</div>
                     <div></div>
@@ -1474,6 +1672,21 @@
         <div class="modal-footer">
             <button type="button" class="low-emphasis" data-modal-action="hide">Cancel</button>
             <button type="button" class="danger" id="hotkey-list-reset" data-modal-action="hide">Reset All</button>
+        </div>
+    </div></div>
+
+    <!-- Firefox Data Transmission Consent -->
+    <div id="firefox-data-transmission-consent-modal" data-show-for-browser="firefox firefox-mobile" class="modal force-interact" tabindex="-1" role="dialog" hidden><div class="modal-content">
+        <div class="modal-header"><div class="modal-title">Data Transmission Consent</div></div>
+        <div class="modal-body">
+            <p>To comply with <a href="https://extensionworkshop.com/documentation/publish/add-on-policies/">Firefox Add-On Policies</a>, Yomitan is required to get your verification that you are comfortable with any default data transmission the extension does.</p>
+            <p>Yomitan does very little data transmission, as Yomitan data is stored locally on your device. Yomitan does not sell or externally collect any user data.</p>
+            <p><b>The only place data transmission is done by default is when the audio icon in the Yomitan popup is clicked to play the audio for a term; in this case a request will be sent to the audio provider configured in your settings.</b></p>
+            <p>This request may contain the term, reading, and/or language for the given dictionary entry term. <b>Personally identifying information is never sent.</b></p>
+            <p>Full details on Yomitan's use of data transmission are provided in the <a href="https://addons.mozilla.org/en-US/firefox/addon/yomitan/privacy/">Yomitan Privacy Policy</a>.</p>        </div>
+        <div class="modal-footer modal-footer-spaced">
+            <button type="button" class="danger low-emphasis" data-modal-action="hide" id="decline-data-transmission">Decline data transmission<br>(disable audio playback)</button>
+            <button type="button" class="low-emphasis" data-modal-action="hide" id="accept-data-transmission">Agree to data transmission<br>(enable audio playback)</button>
         </div>
     </div></div>
 </template>

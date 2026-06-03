@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2020-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -43,15 +43,18 @@ function main() {
     const schema = parseJson(schemaSource);
 
     for (const dataFileName of args.slice(1)) {
+        // eslint-disable-next-line no-restricted-syntax
         const start = performance.now();
         try {
             console.log(`Validating ${dataFileName}...`);
             const dataSource = fs.readFileSync(dataFileName, {encoding: 'utf8'});
             const data = parseJson(dataSource);
             createJsonSchema(mode, schema).validate(data);
+            // eslint-disable-next-line no-restricted-syntax
             const end = performance.now();
             console.log(`No issues detected (${((end - start) / 1000).toFixed(2)}s)`);
         } catch (e) {
+            // eslint-disable-next-line no-restricted-syntax
             const end = performance.now();
             console.log(`Encountered an error (${((end - start) / 1000).toFixed(2)}s)`);
             console.warn(e);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2020-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -260,6 +260,13 @@ export class PopupWindow extends EventDispatcher {
      * @returns {Promise<boolean>} `true` if the size assignment was successful, `false` otherwise.
      */
     async setFrameSize(_width, _height) {
+        return false;
+    }
+
+    /**
+     * @returns {Promise<boolean>}
+     */
+    async isPointerOver() {
         return false;
     }
 

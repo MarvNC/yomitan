@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2019-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,6 +15,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
+import {log} from './log.js';
+import {toError} from './to-error.js';
+
 
 /**
  * Converts any string into a form that can be passed into the RegExp constructor.
@@ -261,4 +265,82 @@ export function deferPromise() {
  */
 export function promiseTimeout(delay) {
     return delay <= 0 ? Promise.resolve() : new Promise((resolve) => { setTimeout(resolve, delay); });
+}
+
+/**
+ * @param {string} css
+ * @returns {string}
+ */
+export function sanitizeCSS(css) {
+    const sanitizer = new CSSStyleSheet();
+    sanitizer.replaceSync(css);
+    return [...sanitizer.cssRules].map((rule) => rule.cssText || '').join('\n');
+}
+
+/**
+ * @param {string} css
+ * @param {string} scopeSelector
+ * @returns {string}
+ */
+export function addScopeToCss(css, scopeSelector) {
+    return scopeSelector + ' {' + css + '\n}';
+}
+
+/**
+ * Older browser versions do not support nested css and cannot use the normal `addScopeToCss`.
+ * All major web browsers should be fine but Anki is still distributing Chromium 112 on some platforms as of Anki version 24.11.
+ * As of Anki 25.02, nesting is supported. However, many users take issue with changes around this time and refuse to update.
+ * Chromium 120+ is required for full support.
+ * @param {string} css
+ * @param {string} scopeSelector
+ * @returns {string}
+ */
+export function addScopeToCssLegacy(css, scopeSelector) {
+    try {
+        const stylesheet = new CSSStyleSheet();
+        stylesheet.replaceSync(css);
+        const newCSSRules = [];
+        for (const cssRule of stylesheet.cssRules) {
+            // ignore non-style rules
+            if (!(cssRule instanceof CSSStyleRule)) {
+                continue;
+            }
+
+            const newSelectors = [];
+            for (const selector of cssRule.selectorText.split(',')) {
+                newSelectors.push(scopeSelector + ' ' + selector);
+            }
+            const newRule = cssRule.cssText.replace(cssRule.selectorText, newSelectors.join(', '));
+            newCSSRules.push(newRule);
+        }
+        stylesheet.replaceSync(newCSSRules.join('\n'));
+        return [...stylesheet.cssRules].map((rule) => rule.cssText || '').join('\n');
+    } catch (e) {
+        log.log('addScopeToCssLegacy failed, falling back on addScopeToCss: ' + toError(e).message);
+        return addScopeToCss(css, scopeSelector);
+    }
+}
+
+/**
+ * @param {'SHA-256'|'SHA-384'|'SHA-512'} algorithm
+ * @param {ArrayBuffer} arrayBuffer
+ * @returns {Promise<string>}
+ */
+export async function arrayBufferDigest(algorithm, arrayBuffer) {
+    const hash = new Uint8Array(await crypto.subtle.digest(algorithm, new Uint8Array(arrayBuffer)));
+    let digest = '';
+    for (const byte of hash) {
+        digest += byte.toString(16).padStart(2, '0');
+    }
+    return digest;
+}
+
+/**
+ * @param {'SHA-1'|'SHA-256'|'SHA-384'|'SHA-512'} algorithm
+ * @param {ArrayBuffer} arrayBuffer
+ * @returns {Promise<string>}
+ */
+export async function unsafeArrayBufferDigest(algorithm, arrayBuffer) {
+    // @ts-expect-error - Allow SHA-1 here
+    return arrayBufferDigest(algorithm, arrayBuffer);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@ describe('AnkiTemplateRenderer', () => {
                 type: 'kanji',
                 character: 'c',
                 dictionary: 'dictionary',
+                dictionaryIndex: 0,
                 dictionaryAlias: 'dictionaryAlias',
                 onyomi: [],
                 kunyomi: [],
@@ -38,7 +39,14 @@ describe('AnkiTemplateRenderer', () => {
                 frequencies: [],
             },
             resultOutputMode: 'split',
-            mode: 'test',
+            cardFormat: {
+                type: 'term',
+                name: 'test',
+                deck: 'deck',
+                model: 'model',
+                fields: {},
+                icon: 'big-circle',
+            },
             glossaryLayoutMode: 'default',
             compactTags: false,
             context: {

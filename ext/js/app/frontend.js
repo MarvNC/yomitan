@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2016-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,6 +20,7 @@ import {createApiMap, invokeApiMapHandler} from '../core/api-map.js';
 import {EventListenerCollection} from '../core/event-listener-collection.js';
 import {log} from '../core/log.js';
 import {promiseAnimationFrame} from '../core/promise-animation-frame.js';
+import {safePerformance} from '../core/safe-performance.js';
 import {setProfile} from '../data/profiles-util.js';
 import {addFullscreenChangeEventListener, getFullscreenElement} from '../dom/document-util.js';
 import {TextSourceElement} from '../dom/text-source-element.js';
@@ -47,6 +48,7 @@ export class Frontend {
         allowRootFramePopupProxy,
         childrenSupported = true,
         hotkeyHandler,
+        browser,
     }) {
         /** @type {import('../application.js').Application} */
         this._application = application;
@@ -94,6 +96,7 @@ export class Frontend {
             searchTerms: true,
             searchKanji: true,
             textSourceGenerator: this._textSourceGenerator,
+            browser: browser,
         });
         /** @type {boolean} */
         this._textScannerHasBeenEnabled = false;
@@ -224,7 +227,7 @@ export class Frontend {
      */
     async setTextSource(textSource) {
         this._textScanner.setCurrentTextSource(null);
-        await this._textScanner.search(textSource);
+        await this._textScanner.search(textSource, null, false, true);
     }
 
     /**
@@ -401,7 +404,7 @@ export class Frontend {
     _onSearchEmpty() {
         const scanningOptions = /** @type {import('settings').ProfileOptions} */ (this._options).scanning;
         if (scanningOptions.autoHideResults) {
-            this._clearSelectionDelayed(scanningOptions.hideDelay, false, false);
+            void this._clearSelectionDelayed(scanningOptions.hideDelay, false, false);
         }
     }
 
@@ -423,7 +426,6 @@ export class Frontend {
      */
     _onPopupFramePointerOver() {
         this._isPointerOverPopup = true;
-        this._stopClearSelectionDelayed();
     }
 
     /**
@@ -431,9 +433,10 @@ export class Frontend {
      */
     _onPopupFramePointerOut() {
         this._isPointerOverPopup = false;
-        const scanningOptions = /** @type {import('settings').ProfileOptions} */ (this._options).scanning;
-        if (scanningOptions.hidePopupOnCursorExit) {
-            this._clearSelectionDelayed(scanningOptions.hidePopupOnCursorExitDelay, false, false);
+        if (!this._options) { return; }
+        const {scanning: {hidePopupOnCursorExit, hidePopupOnCursorExitDelay}} = this._options;
+        if (hidePopupOnCursorExit) {
+            void this._clearSelectionDelayed(hidePopupOnCursorExitDelay, false, false);
         }
     }
 
@@ -456,18 +459,66 @@ export class Frontend {
     }
 
     /**
+     * Checks if the pointer is over any popup in the hierarchy (parent or child popups).
+     * @returns {Promise<boolean>}
+     * @private
+     */
+    async _isPointerOverAnyPopup() {
+        if (this._isPointerOverPopup) {
+            return true;
+        }
+
+        let childPopup = this._popup?.child;
+        while (typeof childPopup !== 'undefined' && childPopup !== null) {
+            try {
+                const isOver = childPopup.isPointerOver();
+                if (isOver) {
+                    return true;
+                }
+                childPopup = childPopup.child;
+            } catch (e) {
+                log.warn(new Error('Error checking child popup pointer state'));
+            }
+        }
+
+        let parentPopup = this._popup?.parent;
+        while (typeof parentPopup !== 'undefined' && parentPopup !== null) {
+            try {
+                const isOver = parentPopup.isPointerOver();
+                if (isOver) {
+                    return true;
+                }
+                parentPopup = parentPopup.parent;
+            } catch (e) {
+                log.warn(new Error('Error checking parent popup pointer state'));
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param {number} delay
      * @param {boolean} restart
      * @param {boolean} passive
      */
-    _clearSelectionDelayed(delay, restart, passive) {
+    async _clearSelectionDelayed(delay, restart, passive) {
         if (!this._textScanner.hasSelection()) { return; }
+
+        // Add a small delay to allow mouseover events to be processed
+        await new Promise((resolve) => {
+            setTimeout(resolve, 50);
+        });
+
+        // Always check if pointer is over any popup before clearing
+        if (await this._isPointerOverAnyPopup()) { return; }
+
         if (delay > 0) {
             if (this._clearSelectionTimer !== null && !restart) { return; } // Already running
             this._stopClearSelectionDelayed();
-            this._clearSelectionTimer = setTimeout(() => {
+            this._clearSelectionTimer = setTimeout(async () => {
                 this._clearSelectionTimer = null;
-                if (this._isPointerOverPopup) { return; }
+                if (await this._isPointerOverAnyPopup()) { return; }
                 this._clearSelection(passive);
             }, delay);
         } else {
@@ -498,7 +549,10 @@ export class Frontend {
 
         await this._updatePopup();
 
-        const preventMiddleMouse = this._getPreventMiddleMouseValueForPageType(scanningOptions.preventMiddleMouse);
+        const preventMiddleMouseOnPage = this._getPreventSecondaryMouseValueForPageType(scanningOptions.preventMiddleMouse);
+        const preventMiddleMouseOnTextHover = scanningOptions.preventMiddleMouse.onTextHover;
+        const preventBackForwardOnPage = this._getPreventSecondaryMouseValueForPageType(scanningOptions.preventBackForward);
+        const preventBackForwardOnTextHover = scanningOptions.preventBackForward.onTextHover;
         this._textScanner.language = options.general.language;
         this._textScanner.setOptions({
             inputs: scanningOptions.inputs,
@@ -506,12 +560,12 @@ export class Frontend {
             normalizeCssZoom: scanningOptions.normalizeCssZoom,
             selectText: scanningOptions.selectText,
             delay: scanningOptions.delay,
-            touchInputEnabled: scanningOptions.touchInputEnabled,
-            pointerEventsEnabled: scanningOptions.pointerEventsEnabled,
             scanLength: scanningOptions.length,
             layoutAwareScan: scanningOptions.layoutAwareScan,
-            matchTypePrefix: scanningOptions.matchTypePrefix,
-            preventMiddleMouse,
+            preventMiddleMouseOnPage,
+            preventMiddleMouseOnTextHover,
+            preventBackForwardOnPage,
+            preventBackForwardOnTextHover,
             sentenceParsingOptions,
             scanWithoutMousemove: scanningOptions.scanWithoutMousemove,
             scanResolution: scanningOptions.scanResolution,
@@ -596,8 +650,8 @@ export class Frontend {
         this._popupEventListeners.removeAllEventListeners();
         this._popup = popup;
         if (popup !== null) {
-            this._popupEventListeners.on(popup, 'framePointerOver', this._onPopupFramePointerOver.bind(this));
-            this._popupEventListeners.on(popup, 'framePointerOut', this._onPopupFramePointerOut.bind(this));
+            this._popupEventListeners.on(popup, 'mouseOver', this._onPopupFramePointerOver.bind(this));
+            this._popupEventListeners.on(popup, 'mouseOut', this._onPopupFramePointerOut.bind(this));
         }
         this._isPointerOverPopup = false;
     }
@@ -900,14 +954,14 @@ export class Frontend {
     }
 
     /**
-     * @param {import('settings').PreventMiddleMouseOptions} preventMiddleMouseOptions
+     * @param {import('settings').PreventSecondaryMouseOptions} preventSecondaryMouseOptions
      * @returns {boolean}
      */
-    _getPreventMiddleMouseValueForPageType(preventMiddleMouseOptions) {
+    _getPreventSecondaryMouseValueForPageType(preventSecondaryMouseOptions) {
         switch (this._pageType) {
-            case 'web': return preventMiddleMouseOptions.onWebPages;
-            case 'popup': return preventMiddleMouseOptions.onPopupPages;
-            case 'search': return preventMiddleMouseOptions.onSearchPages;
+            case 'web': return preventSecondaryMouseOptions.onWebPages;
+            case 'popup': return preventSecondaryMouseOptions.onPopupPages;
+            case 'search': return preventSecondaryMouseOptions.onSearchPages;
         }
     }
 
@@ -954,10 +1008,13 @@ export class Frontend {
      * @returns {Promise<boolean>}
      */
     async _scanSelectedText(allowEmptyRange, disallowExpandSelection, showEmpty = false) {
+        safePerformance.mark('frontend:scanSelectedText:start');
         const range = this._getFirstSelectionRange(allowEmptyRange);
         if (range === null) { return false; }
         const source = disallowExpandSelection ? TextSourceRange.createLazy(range) : TextSourceRange.create(range);
         await this._textScanner.search(source, {focus: true, restoreSelection: true}, showEmpty);
+        safePerformance.mark('frontend:scanSelectedText:end');
+        safePerformance.measure('frontend:scanSelectedText', 'frontend:scanSelectedText:start', 'frontend:scanSelectedText:end');
         return true;
     }
 

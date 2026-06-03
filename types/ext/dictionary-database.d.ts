@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,9 +36,11 @@ export type MediaDataArrayBufferContent = MediaDataBase<ArrayBuffer>;
 
 export type MediaDataStringContent = MediaDataBase<string>;
 
-type MediaType = ArrayBuffer | string;
+type MediaType = ArrayBuffer | string | null;
 
 export type Media<T extends MediaType = ArrayBuffer> = {index: number} & MediaDataBase<T>;
+
+export type DrawMedia<T extends MediaType = ArrayBuffer> = {index: number} & MediaDataBase<T> & {canvasWidth: number, canvasHeight: number, canvasIndexes: number[], generation: number};
 
 export type DatabaseTermEntry = {
     expression: string;
@@ -211,6 +213,11 @@ export type ObjectStoreData<T extends ObjectStoreName> = (
     never
 );
 
+export type DatabaseUpdateItem = {
+    primaryKey: IDBValidKey;
+    data: ObjectStoreData<T>;
+};
+
 export type DeleteDictionaryProgressData = {
     count: number;
     processed: number;
@@ -239,6 +246,24 @@ export type MediaRequest = {
     dictionary: string;
 };
 
+export type DrawMediaRequest = {
+    path: string;
+    dictionary: string;
+    canvasIndex: number;
+    canvasWidth: number;
+    canvasHeight: number;
+    generation: number;
+};
+
+export type DrawMediaGroupedRequest = {
+    path: string;
+    dictionary: string;
+    canvasIndexes: number[];
+    canvasWidth: number;
+    canvasHeight: number;
+    generation: number;
+};
+
 export type FindMultiBulkData<TItem = unknown> = {
     item: TItem;
     itemIndex: number;
@@ -253,4 +278,58 @@ export type CreateResult<TItem = unknown, TRow = unknown, TResult = unknown> = (
 
 export type DictionarySet = {
     has(value: string): boolean;
+};
+
+/** API for communicating with its own worker */
+
+import type {
+    ApiMap as BaseApiMap,
+    ApiMapInit as BaseApiMapInit,
+    ApiHandler as BaseApiHandler,
+    ApiParams as BaseApiParams,
+    ApiReturn as BaseApiReturn,
+    ApiNames as BaseApiNames,
+    ApiParam as BaseApiParam,
+    ApiParamNames as BaseApiParamNames,
+    ApiParamsAny as BaseApiParamsAny,
+} from './api-map';
+
+type ApiSurface = {
+    drawMedia: {
+        params: {
+            requests: DrawMediaRequest[];
+        };
+        return: void;
+    };
+    dummy: {
+        params: void;
+        return: void;
+    };
+};
+
+type ApiExtraArgs = [port: MessagePort];
+
+export type ApiNames = BaseApiNames<ApiSurface>;
+
+export type ApiMap = BaseApiMap<ApiSurface, ApiExtraArgs>;
+
+export type ApiMapInit = BaseApiMapInit<ApiSurface, ApiExtraArgs>;
+
+export type ApiHandler<TName extends ApiNames> = BaseApiHandler<ApiSurface[TName], ApiExtraArgs>;
+
+export type ApiHandlerNoExtraArgs<TName extends ApiNames> = BaseApiHandler<ApiSurface[TName], []>;
+
+export type ApiParams<TName extends ApiNames> = BaseApiParams<ApiSurface[TName]>;
+
+export type ApiParam<TName extends ApiNames, TParamName extends BaseApiParamNames<ApiSurface[TName]>> = BaseApiParam<ApiSurface[TName], TParamName>;
+
+export type ApiReturn<TName extends ApiNames> = BaseApiReturn<ApiSurface[TName]>;
+
+export type ApiParamsAny = BaseApiParamsAny<ApiSurface>;
+
+export type ApiMessageAny = {[name in ApiNames]: ApiMessage<name>}[ApiNames];
+
+type ApiMessage<TName extends ApiNames> = {
+    action: TName;
+    params: ApiParams<TName>;
 };

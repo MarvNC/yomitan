@@ -76,7 +76,39 @@ After building, you can load the compiled extension into Chromium browsers.
 
 Immediately you should see the "Welcome" page!
 
-Note: Yomitan may or may not update when you make and save new code changes locally. It depends on what file you've changed. Yomitan runs as collection of two programs. There is the background process called the "service worker" and there is the frontend called the "content_script". The frontend will reload on save, but to update the backend you need to click on the update icon next to the extension in `chrome://extensions/`. If you make changes to the manifest you will need to rerun `npm run build` to regenerate the manifest file.
+Note: Yomitan may or may not update when you make and save new code changes locally. It depends on what file you've changed. Yomitan runs as a collection of two programs. There is the background process called the "service worker" and there is the frontend called the "content_script". The frontend will reload on save, but to update the backend you need to click on the update icon next to the extension in `chrome://extensions/`. If you make changes to the manifest you will need to rerun `npm run build` to regenerate the manifest file.
+
+### Loading a build into Firefox browser
+
+After building, you can load the compiled extension into the Firefox browser.
+
+- Navigate to the Debugging page, type `about:debugging` into the url
+- Click on "This Firefox" on the left
+- Click on "Load Temporary Add-on" on the right
+- Navigate to the `yomitan-firefox-dev.zip` in your builds folder
+
+Immediately you should see the "Welcome" page!
+
+Note: The "Load Temporary Add-on" option is temporary and the build will need to be loaded again after browser restarts. Sometimes testing extension features between browser restarts will be necessary so here are the steps to bypass this restriction.
+
+- Download Firefox Developer or Nightly
+- Navigate to the Config page, type `about:config` into the url
+- Look up `xpinstall.signatures.required` setting on the search bar at the top
+- Toggle the value to "false"
+- Navigate to the "Extensions" page using "Manage extensions"
+- Either use drag and drop or "Install Add-on from File" to load the dev build
+
+### Loading an unpacked build into Microsoft Edge browser
+
+After building, you can load the compiled extension into the Edge browser.
+
+- Unpack the `yomitan-edge.zip`
+- Navigate to the extension page using the "..." on the top right and clicking on "Manage extensions"
+- Turn on the toggle on the left that says "Developer Mode"
+- Click "Load unpacked" on the top right
+- Select the unpacked `yomitan-edge` folder
+
+Immediately you should see the "Welcome" page!
 
 ### Build Tools
 
@@ -89,15 +121,54 @@ Otherwise, the [JSZip](https://stuk.github.io/jszip/) API is used to generate th
 
 Manifest variants for different build targets are specified in [manifest-variants.json](dev/data/manifest-variants.json).
 This file is used to generate the `ext/manifest.json` file included in the extension.
-The generated `ext/manfiest.json` should not be committed.
+The generated `ext/manifest.json` should not be committed.
 
 ## Style
 
 Linting rules are defined for a few types of files, and validation is performed as part of the standard tests
 run by `npm test` and the continuous integration process.
 
-- [.eslintrc.json](.eslintrc.json) rules are used for JavaScript files.
+- [eslint.config.js](eslint.config.js) rules are used for JavaScript files.
 - [.stylelintrc.json](.stylelintrc.json) rules are used for CSS files.
 - [.htmlvalidate.json](.htmlvalidate.json) rules are used for HTML files.
 
 In addition, the [Markdown All in One VSCode extension](https://github.com/yzhang-gh/vscode-markdown) is used for formatting markdown files and automatically updating the table of contents.
+
+## Commit Signing
+
+We highly recommend signing your commits in git.
+
+While it's possible to use GPG for this, we recommend using SSH keys for your signing. Furthermore, if you have appropriate hardware support (which most modern machines do), we recommend storing the key in a hardware TPM so it's impossible for malware to steal it off your machine.
+
+### Understanding why
+
+GitHub already requires a key when you connect to it for basic git operations (pull, push, etc.). They call this the "authentication key" and it is an SSH key. You presumably already have one of these if you have ever used GitHub for anything before.
+
+The commit signing key is different, and is used for signing the contents of a commit. This is important because it gives us much more useful git history where we actually have guarantees about who wrote what parts of the code. With no commit signing, it is easy with someone with push access to include commits with fake author names etc., which can be quite troubling when trying to figure out what has happened during a security incident. (See [this article](https://withblue.ink/2020/05/17/how-and-why-to-sign-git-commits.html) for more.)
+
+### Creating the SSH key for signing
+
+- On Mac, you can use [secretive](https://github.com/maxgoedjen/secretive) to have Secure Enclave-backed SSH operations.
+- On Linux, you can use [ssh-tpm-agent](https://github.com/Foxboron/ssh-tpm-agent) to use your hardware TPM for SSH operations.
+- On any OS, you can use a [YubiKey for SSH operations](https://developers.yubico.com/SSH/Securing_SSH_with_FIDO2.html). A YubiKey is arguably slightly more secure than a normal TPM, especially if you get a YubiKey bio, but in our threat model we consider them to be equivalent so there is no need to buy one if you already have a TPM.
+- As a last resort if you're on old hardware and also don't have money to buy a YubiKey, you can create the SSH key on disk as opposed to in a TPM, but it's much more exposed to malware and supply chain attacks (e.g., a malcious npm package that steals SSH keys etc).
+
+When generating the signing key, we recommend requiring user verification (i.e., entering a PIN or presenting a biometric). However for the "authentication key" (the normal SSH key you use to do non-signed operations with GitHub (like pulls)), we do not consider it as important to have user verification as many of those operations are not very sensitive, and it can be annoying to present your verification factor when just doing a pull. Of course it doesn't hurt to have extra user verification security-wise as it's also used for pushes, but the malicious things that could be pushed would be limited since at most the attacker could remove some signed commits, but not create any.
+
+### Exposing your SSH key to git for commit signing
+
+Once you have set up your SSH key (either using the above hardware-backed methods for optimal security, or just a normal on-disk key if you don't have a TPM available in your hardware), you can expose it to git for signing operations as follows:
+
+```
+git config --global gpg.format ssh
+git config --global user.signingkey /path/to/key
+git config --global commit.gpgsign true
+```
+
+(Confusingly the option names have 'gpg' in them, but rest assured GPG is not involved once you switch the format to SSH with the first command.)
+
+### Registering your SSH key with GitHub
+
+Go to [https://github.com/settings/keys](https://github.com/settings/keys) and click "Add new SSH key". On the following page, make sure to change "Key type" to "Signing key". Then paste the public key into the textbox.
+
+With this, you are done and your commits should be signed (which you can see on the GitHub interface with the "Verified" green mark next to your commits).

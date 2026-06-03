@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -40,16 +40,18 @@ export type ImportResult = {
 
 export type ImportDetails = {
     prefixWildcardsSupported: boolean;
+    yomitanVersion: string;
 };
 
 export type Summary = {
     title: string;
     revision: string;
     sequenced: boolean;
+    minimumYomitanVersion?: string;
     version: number;
     importDate: number;
     prefixWildcardsSupported: boolean;
-    counts: SummaryCounts;
+    counts?: SummaryCounts;
     styles: string;
     isUpdatable?: boolean;
     indexUrl?: string;
@@ -60,13 +62,16 @@ export type Summary = {
     attribution?: string;
     sourceLanguage?: string;
     targetLanguage?: string;
-    frequencyMode?: 'occurrence-based' | 'rank-based';
+    frequencyMode?: DictionaryData.FrequencyMode;
+    importSuccess?: boolean;
 };
 
 export type SummaryDetails = {
     prefixWildcardsSupported: boolean;
     counts: SummaryCounts;
     styles: string;
+    yomitanVersion: string;
+    importSuccess: boolean;
 };
 
 export type SummaryCounts = {
@@ -83,7 +88,7 @@ export type SummaryItemCount = {
 };
 
 export type SummaryMetaCount = {
-    total: number;
+    [total: string]: number;
     [key: string]: number;
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2020-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -49,7 +49,7 @@ export async function createTranslatorContext(dictionaryDirectory, dictionaryNam
     const {errors, result} = await dictionaryImporter.importDictionary(
         dictionaryDatabase,
         testDictionaryData,
-        {prefixWildcardsSupported: true},
+        {prefixWildcardsSupported: true, yomitanVersion: '0.0.0.0'},
     );
 
     expect(errors.length).toEqual(0);

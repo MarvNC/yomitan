@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024  Yomitan Authors
+ * Copyright (C) 2024-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,31 +15,59 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import {removeArabicScriptDiacritics} from './ar/arabic-text-preprocessors.js';
+import {removeSyriacScriptDiacritics} from './aii/assyrian-neo-aramaic-text-preprocessors.js';
+import {
+    addHamzaBottom,
+    addHamzaTop,
+    convertAlifMaqsuraToYaa,
+    convertHaToTaMarbuta,
+    normalizeUnicode,
+    removeArabicScriptDiacritics,
+    removeTatweel,
+} from './ar/arabic-text-preprocessors.js';
+import {arabicTransforms} from './ar/arabic-transforms.js';
+import {normalizeRadicalCharacters} from './CJK-util.js';
 import {eszettPreprocessor} from './de/german-text-preprocessors.js';
 import {germanTransforms} from './de/german-transforms.js';
+import {removeDoubleAcuteAccents} from './el/modern-greek-processors.js';
+import {modernGreekTransforms} from './el/modern-greek-transforms.js';
 import {englishTransforms} from './en/english-transforms.js';
+import {esperantoTransforms} from './eo/esperanto-transforms.js';
 import {spanishTransforms} from './es/spanish-transforms.js';
+import {basqueTransforms} from './eu/basque-transforms.js';
+import {apostropheVariants} from './fr/french-text-preprocessors.js';
+import {frenchTransforms} from './fr/french-transforms.js';
+import {irishTransforms} from './ga/irish-transforms.js';
+import {convertLatinToGreek} from './grc/ancient-greek-processors.js';
+import {ancientGreekTransforms} from './grc/ancient-greek-transforms.js';
+import {removeApostrophedWords} from './it/italian-processors.js';
 import {
     alphabeticToHiragana,
     alphanumericWidthVariants,
     collapseEmphaticSequences,
     convertHalfWidthCharacters,
     convertHiraganaToKatakana,
+    normalizeCJKCompatibilityCharacters,
     normalizeCombiningCharacters,
+    standardizeKanji,
 } from './ja/japanese-text-preprocessors.js';
 import {japaneseTransforms} from './ja/japanese-transforms.js';
 import {isStringPartiallyJapanese} from './ja/japanese.js';
+import {georgianTransforms} from './ka/georgian-transforms.js';
 import {disassembleHangul, reassembleHangul} from './ko/korean-text-processors.js';
 import {koreanTransforms} from './ko/korean-transforms.js';
+import {processDiphtongs} from './la/latin-text-preprocessors.js';
 import {latinTransforms} from './la/latin-transforms.js';
 import {removeRussianDiacritics, yoToE} from './ru/russian-text-preprocessors.js';
 import {oldIrishTransforms} from './sga/old-irish-transforms.js';
-import {removeSerboCroatianAccentMarks} from './sh/serbo-croatian-text-preprocessors.js';
+import {addSerboCroatianDiacritics, removeSerboCroatianAccentMarks} from './sh/serbo-croatian-text-preprocessors.js';
 import {albanianTransforms} from './sq/albanian-transforms.js';
 import {capitalizeFirstLetter, decapitalize, removeAlphabeticDiacritics} from './text-processors.js';
 import {tagalogTransforms} from './tl/tagalog-transforms.js';
 import {normalizeDiacritics} from './vi/viet-text-preprocessors.js';
+import {convertFinalLetters, convertYiddishLigatures} from './yi/yiddish-text-postprocessors.js';
+import {combineYiddishLigatures, removeYiddishDiacritics} from './yi/yiddish-text-preprocessors.js';
+import {yiddishTransforms} from './yi/yiddish-transforms.js';
 import {isStringPartiallyChinese, normalizePinyin} from './zh/chinese.js';
 
 const capitalizationPreprocessors = {
@@ -50,13 +78,64 @@ const capitalizationPreprocessors = {
 /** @type {import('language-descriptors').LanguageDescriptorAny[]} */
 const languageDescriptors = [
     {
+        iso: 'xxx',
+        iso639_3: 'xxx',
+        name: 'Any / Unknown',
+        exampleText: '???',
+    },
+    {
+        iso: 'aii',
+        iso639_3: 'aii',
+        name: 'Assyrian Neo-Aramaic',
+        exampleText: 'ܟܵܬܹܒ݂',
+        textPreprocessors: {
+            removeSyriacScriptDiacritics,
+        },
+    },
+    {
         iso: 'ar',
         iso639_3: 'ara',
-        name: 'Arabic',
+        name: 'Arabic (MSA)',
         exampleText: 'قَرَأَ',
         textPreprocessors: {
             removeArabicScriptDiacritics,
+            removeTatweel,
+            normalizeUnicode,
+            addHamzaTop,
+            addHamzaBottom,
+            convertAlifMaqsuraToYaa,
         },
+        languageTransforms: arabicTransforms,
+    },
+    {
+        iso: 'arz',
+        iso639_3: 'arz',
+        name: 'Arabic (Egyptian)',
+        exampleText: 'قَرَأَ',
+        textPreprocessors: {
+            removeArabicScriptDiacritics,
+            removeTatweel,
+            normalizeUnicode,
+            addHamzaTop,
+            addHamzaBottom,
+            convertAlifMaqsuraToYaa,
+            convertHaToTaMarbuta,
+        },
+        languageTransforms: arabicTransforms,
+    },
+    {
+        iso: 'be',
+        iso639_3: 'bel',
+        name: 'Belarusian',
+        exampleText: 'чытаць',
+        textPreprocessors: capitalizationPreprocessors,
+    },
+    {
+        iso: 'bg',
+        iso639_3: 'bul',
+        name: 'Bulgarian',
+        exampleText: 'чета',
+        textPreprocessors: capitalizationPreprocessors,
     },
     {
         iso: 'cs',
@@ -78,7 +157,7 @@ const languageDescriptors = [
         iso: 'de',
         iso639_3: 'deu',
         name: 'German',
-        exampleText: 'gelesen',
+        exampleText: 'lesen',
         textPreprocessors: {
             ...capitalizationPreprocessors,
             eszettPreprocessor,
@@ -90,7 +169,11 @@ const languageDescriptors = [
         iso639_3: 'ell',
         name: 'Greek',
         exampleText: 'διαβάζω',
-        textPreprocessors: capitalizationPreprocessors,
+        textPreprocessors: {
+            ...capitalizationPreprocessors,
+            removeDoubleAcuteAccents,
+        },
+        languageTransforms: modernGreekTransforms,
     },
     {
         iso: 'en',
@@ -106,6 +189,7 @@ const languageDescriptors = [
         name: 'Esperanto',
         exampleText: 'legi',
         textPreprocessors: capitalizationPreprocessors,
+        languageTransforms: esperantoTransforms,
     },
     {
         iso: 'es',
@@ -114,6 +198,21 @@ const languageDescriptors = [
         exampleText: 'leer',
         textPreprocessors: capitalizationPreprocessors,
         languageTransforms: spanishTransforms,
+    },
+    {
+        iso: 'et',
+        iso639_3: 'est',
+        name: 'Estonian',
+        exampleText: 'lugema',
+        textPreprocessors: capitalizationPreprocessors,
+    },
+    {
+        iso: 'eu',
+        iso639_3: 'eus',
+        name: 'Basque',
+        exampleText: 'irakurri',
+        languageTransforms: basqueTransforms,
+        textPreprocessors: capitalizationPreprocessors,
     },
     {
         iso: 'fa',
@@ -136,17 +235,52 @@ const languageDescriptors = [
         iso639_3: 'fra',
         name: 'French',
         exampleText: 'lire',
+        textPreprocessors: {
+            ...capitalizationPreprocessors,
+            apostropheVariants,
+        },
+        languageTransforms: frenchTransforms,
+    },
+    {
+        iso: 'ga',
+        iso639_3: 'gle',
+        name: 'Irish',
+        exampleText: 'léigh',
+        textPreprocessors: capitalizationPreprocessors,
+        languageTransforms: irishTransforms,
+    },
+    {
+        iso: 'gd',
+        iso639_3: 'gla',
+        name: 'Scottish Gaelic',
+        exampleText: 'leugh',
         textPreprocessors: capitalizationPreprocessors,
     },
     {
         iso: 'grc',
         iso639_3: 'grc',
         name: 'Ancient Greek',
-        exampleText: 'γράφω',
+        exampleText: 'γράφω', /* 'to write' */
         textPreprocessors: {
             ...capitalizationPreprocessors,
             removeAlphabeticDiacritics,
+            convertLatinToGreek,
         },
+        languageTransforms: ancientGreekTransforms,
+    },
+    {
+        // no 2 letter iso for hawaiian
+        iso: 'haw',
+        iso639_3: 'haw',
+        name: 'Hawaiian',
+        exampleText: 'heluhelu',
+        textPreprocessors: capitalizationPreprocessors,
+    },
+    {
+        iso: 'he',
+        iso639_3: 'heb',
+        name: 'Hebrew',
+        exampleText: 'קריאה',
     },
     {
         iso: 'hi',
@@ -165,8 +299,11 @@ const languageDescriptors = [
         iso: 'id',
         iso639_3: 'ind',
         name: 'Indonesian',
-        exampleText: 'membaca',
-        textPreprocessors: capitalizationPreprocessors,
+        exampleText: 'baca',
+        textPreprocessors: {
+            ...capitalizationPreprocessors,
+            removeAlphabeticDiacritics,
+        },
     },
     {
         iso: 'it',
@@ -176,16 +313,18 @@ const languageDescriptors = [
         textPreprocessors: {
             ...capitalizationPreprocessors,
             removeAlphabeticDiacritics,
+            removeApostrophedWords,
         },
     },
     {
         iso: 'la',
         iso639_3: 'lat',
         name: 'Latin',
-        exampleText: 'legere',
+        exampleText: 'legō',
         textPreprocessors: {
             ...capitalizationPreprocessors,
             removeAlphabeticDiacritics,
+            processDiphtongs,
         },
         languageTransforms: latinTransforms,
     },
@@ -212,11 +351,21 @@ const languageDescriptors = [
             convertHalfWidthCharacters,
             alphabeticToHiragana,
             normalizeCombiningCharacters,
+            normalizeCJKCompatibilityCharacters,
+            normalizeRadicalCharacters,
             alphanumericWidthVariants,
             convertHiraganaToKatakana,
             collapseEmphaticSequences,
+            standardizeKanji,
         },
         languageTransforms: japaneseTransforms,
+    },
+    {
+        iso: 'ka',
+        iso639_3: 'kat',
+        name: 'Georgian',
+        exampleText: 'კითხვა', // Georgian for “read”
+        languageTransforms: georgianTransforms,
     },
     {
         iso: 'kn',
@@ -251,6 +400,13 @@ const languageDescriptors = [
         textPreprocessors: capitalizationPreprocessors,
     },
     {
+        iso: 'mt',
+        iso639_3: 'mlt',
+        name: 'Maltese',
+        exampleText: 'kiteb',
+        textPreprocessors: capitalizationPreprocessors,
+    },
+    {
         iso: 'nl',
         iso639_3: 'nld',
         name: 'Dutch',
@@ -258,10 +414,19 @@ const languageDescriptors = [
         textPreprocessors: capitalizationPreprocessors,
     },
     {
+        iso: 'no',
+        iso639_3: 'nor',
+        name: 'Norwegian',
+        exampleText: 'lese',
+        textPreprocessors: {
+            ...capitalizationPreprocessors,
+        },
+    },
+    {
         iso: 'pl',
         iso639_3: 'pol',
         name: 'Polish',
-        exampleText: 'czytacie',
+        exampleText: 'czytać',
         textPreprocessors: capitalizationPreprocessors,
     },
     {
@@ -275,7 +440,7 @@ const languageDescriptors = [
         iso: 'ro',
         iso639_3: 'ron',
         name: 'Romanian',
-        exampleText: 'citit',
+        exampleText: 'citi',
         textPreprocessors: {
             ...capitalizationPreprocessors,
             removeAlphabeticDiacritics,
@@ -307,17 +472,18 @@ const languageDescriptors = [
         iso: 'sh',
         iso639_3: 'hbs',
         name: 'Serbo-Croatian',
-        exampleText: 'čitaše',
+        exampleText: 'čìtati',
         textPreprocessors: {
             ...capitalizationPreprocessors,
             removeSerboCroatianAccentMarks,
+            addSerboCroatianDiacritics,
         },
     },
     {
         iso: 'sq',
         iso639_3: 'sqi',
         name: 'Albanian',
-        exampleText: 'ndihmojme',
+        exampleText: 'ndihmoj', /* 'to help' */
         textPreprocessors: capitalizationPreprocessors,
         languageTransforms: albanianTransforms,
     },
@@ -349,14 +515,21 @@ const languageDescriptors = [
         iso: 'tr',
         iso639_3: 'tur',
         name: 'Turkish',
-        exampleText: 'okuyor',
+        exampleText: 'okumak',
+        textPreprocessors: capitalizationPreprocessors,
+    },
+    {
+        iso: 'tok',
+        iso639_3: 'tok',
+        name: 'Toki Pona',
+        exampleText: 'wile',
         textPreprocessors: capitalizationPreprocessors,
     },
     {
         iso: 'uk',
         iso639_3: 'ukr',
         name: 'Ukrainian',
-        exampleText: 'читаєте',
+        exampleText: 'читати',
         textPreprocessors: capitalizationPreprocessors,
     },
     {
@@ -370,10 +543,35 @@ const languageDescriptors = [
         },
     },
     {
+        iso: 'cy',
+        iso639_3: 'cym',
+        name: 'Welsh',
+        exampleText: 'ddarllen',
+        textPreprocessors: capitalizationPreprocessors,
+    },
+    {
+        iso: 'yi',
+        iso639_3: 'yid',
+        name: 'Yiddish',
+        exampleText: 'באַשאַפֿן',
+        textPreprocessors: {
+            removeYiddishDiacritics,
+            combineYiddishLigatures,
+        },
+        textPostprocessors: {
+            convertFinalLetters,
+            convertYiddishLigatures,
+        },
+        languageTransforms: yiddishTransforms,
+    },
+    {
         iso: 'yue',
         iso639_3: 'yue',
         name: 'Cantonese',
         exampleText: '讀',
+        textPreprocessors: {
+            normalizeRadicalCharacters,
+        },
     },
     {
         iso: 'zh',
@@ -382,6 +580,9 @@ const languageDescriptors = [
         exampleText: '读',
         isTextLookupWorthy: isStringPartiallyChinese,
         readingNormalizer: normalizePinyin,
+        textPreprocessors: {
+            normalizeRadicalCharacters,
+        },
     },
 ];
 

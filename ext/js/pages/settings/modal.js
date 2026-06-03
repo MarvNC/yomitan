@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2020-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -28,6 +28,8 @@ export class Modal extends PanelElement {
         this._contentNode = null;
         /** @type {boolean} */
         this._canCloseOnClick = false;
+        /** @type {boolean} */
+        this.forceInteract = node.classList.contains('force-interact');
     }
 
     /** */
@@ -52,7 +54,7 @@ export class Modal extends PanelElement {
      * @param {MouseEvent} e
      */
     _onModalContainerMouseDown(e) {
-        this._canCloseOnClick = (e.currentTarget === e.target);
+        this._canCloseOnClick = (e.currentTarget === e.target) && !this.forceInteract;
     }
 
     /**

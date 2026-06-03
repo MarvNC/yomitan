@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,9 +25,10 @@ export const root = path.join(dirname, '..', '..');
 
 export const test = base.extend({
     // eslint-disable-next-line no-empty-pattern
-    context: async ({}, use) => {
+    context: async ({}, /** @type {(r: import('playwright').BrowserContext) => Promise<void>} */ use) => {
         const pathToExtension = path.join(root, 'ext');
         const context = await chromium.launchPersistentContext('', {
+            ...(process.env.CI ? {channel: 'chrome'} : {}),
             // Disabled: headless: false,
             args: [
                 '--headless=new',
@@ -139,6 +140,7 @@ function getResponseBody(action) {
         case 'modelNames': return ['Mock Model'];
         case 'modelFieldNames': return [...getMockModelFields().keys()];
         case 'canAddNotes': return [true, true];
+        case 'canAddNotesWithErrorDetail': return [{canAdd: true}, {canAdd: true}];
         case 'storeMediaFile': return 'mock_audio.mp3';
         case 'addNote': return 102312488912;
         case 'multi': return [];

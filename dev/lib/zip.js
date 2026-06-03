@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,4 +29,4 @@
  * As a workaround, testing zip data can be generated using {level: 0} compression.
  */
 
-export * from '@zip.js/zip.js/lib/zip.js';
+export * from '@zip.js/zip.js/lib/zip-native.js';

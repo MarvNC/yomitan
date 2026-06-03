@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -80,7 +80,7 @@ export type CrossFrameCommunicationPortDetails = {
     otherFrameId: number;
 };
 
-type ApiSurface = {
+export type ApiSurface = {
     displayPopupMessage1: {
         params: DisplayDirectApiFrameClientMessageAny;
         return: DisplayDirectApiReturnAny;
@@ -233,6 +233,12 @@ type ApiSurface = {
     frameAncestryHandlerRequestFrameInfoResponse: {
         params: RequestFrameInfoResponseParams;
         return: RequestFrameInfoResponseReturn;
+    };
+    popupFactoryIsPointerOver: {
+        params: {
+            id: string;
+        };
+        return: boolean;
     };
 };
 

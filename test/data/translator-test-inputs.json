@@ -7,8 +7,7 @@
                     "${title}",
                     {
                         "index": 0,
-                        "alias": "kanjiDictAlias",
-                        "priority": 0
+                        "alias": "kanjiDictAlias"
                     }
                 ]
             ],
@@ -32,7 +31,6 @@
                     {
                         "index": 0,
                         "alias": "termsDictAlias",
-                        "priority": 0,
                         "allowSecondarySearches": false,
                         "partsOfSpeechFilter": true,
                         "useDeinflections": true
@@ -152,23 +150,30 @@
             "options": "default"
         },
         {
-            "name": "Search using different modes",
+            "name": "Search using different modes - simple",
             "func": "findTerms",
             "mode": "simple",
             "text": "打ち込む",
             "options": "default"
         },
         {
-            "name": "Search using different modes",
+            "name": "Search using different modes - group",
             "func": "findTerms",
             "mode": "group",
             "text": "打ち込む",
             "options": "default"
         },
         {
-            "name": "Search using different modes",
+            "name": "Search using different modes - merge",
             "func": "findTerms",
             "mode": "merge",
+            "text": "打ち込む",
+            "options": "default"
+        },
+        {
+            "name": "Search using different modes - term",
+            "func": "findTerms",
+            "mode": "term",
             "text": "打ち込む",
             "options": "default"
         },
@@ -511,6 +516,46 @@
                     "language": "en",
                     "removeNonJapaneseCharacters": false,
                     "searchResolution": "word"
+                }
+            ]
+        },
+        {
+            "name": "Find terms using primary reading 1",
+            "func": "findTerms",
+            "mode": "split",
+            "text": "自重",
+            "options": [
+                "default",
+                {
+                    "type": "terms",
+                    "primaryReading": "じちょう"
+                }
+            ]
+        },
+        {
+            "name": "Find terms using primary reading 2",
+            "func": "findTerms",
+            "mode": "split",
+            "text": "自重",
+            "options": [
+                "default",
+                {
+                    "type": "terms",
+                    "primaryReading": "じじゅう"
+                }
+            ]
+        },
+        {
+            "name": "Longer match first (PR#1075)",
+            "func": "findTerms",
+            "mode": "split",
+            "text": "oppidorum",
+            "options": [
+                "default",
+                {
+                    "type": "terms",
+                    "language": "la",
+                    "removeNonJapaneseCharacters": false
                 }
             ]
         }

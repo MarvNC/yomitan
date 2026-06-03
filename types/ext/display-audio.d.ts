@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -70,6 +70,7 @@ export type AudioSourceShort = {
 export type AudioMediaOptions = {
     sources: Audio.AudioSourceInfo[];
     preferredAudioIndex: number | null;
+    enableDefaultAudioSources: boolean;
 };
 
 export type PlayAudioResult = {

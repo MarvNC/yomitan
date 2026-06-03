@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,18 +32,10 @@ export type ContextSentence = {
     offset?: number;
 };
 
-export type CreateModeNoTest = 'kanji' | 'term-kanji' | 'term-kana';
-
-export type CreateMode = CreateModeNoTest | 'test';
-
 export type CreateDetails = {
-    /** The dictionary entry. */
     dictionaryEntry: Dictionary.DictionaryEntry;
-    /** The result output mode. */
     resultOutputMode: Settings.ResultOutputMode;
-    /** The mode being used to generate the Anki data. */
-    mode: CreateMode;
-    /** The glossary layout mode. */
+    cardFormat: Settings.AnkiCardFormat;
     glossaryLayoutMode: Settings.GlossaryLayoutMode;
     /** Whether or not compact tags mode is enabled. */
     compactTags: boolean;

@@ -9,7 +9,7 @@
         "noImplicitAny": true,
         "strictPropertyInitialization": true,
         "suppressImplicitAnyIndexErrors": false,
-        "skipLibCheck": false,
+        "skipLibCheck": true,
         "baseUrl": ".",
         "paths": {
             "*": ["./types/ext/*"],
@@ -17,14 +17,20 @@
         },
         "types": [
             "chrome",
+            "dom-webcodecs",
             "firefox-webext-browser",
             "handlebars",
             "jszip",
             "parse5",
-            "wanakana",
             "zip.js",
             "dexie",
             "ajv"
+        ],
+        "lib": [
+            "ES2022",
+            "DOM",
+            "DOM.Iterable",
+            "WebWorker"
         ]
     },
     "include": [

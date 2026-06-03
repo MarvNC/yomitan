@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -130,6 +130,10 @@ export type StyledElement = {
      * Hover text for the element.
      */
     title?: string;
+    /**
+     * Whether or not the details element is open by default.
+     */
+    open?: boolean;
     /**
      * Defines the language of an element in the format defined by RFC 5646.
      */

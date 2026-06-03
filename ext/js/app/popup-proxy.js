@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2019-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -293,6 +293,14 @@ export class PopupProxy extends EventDispatcher {
      */
     setFrameSize(width, height) {
         return this._invokeSafe('popupFactorySetFrameSize', {id: this._id, width, height}, false);
+    }
+
+    /**
+     * Checks if the pointer is over this popup.
+     * @returns {Promise<boolean>} Whether the pointer is over the popup
+     */
+    isPointerOver() {
+        return this._invokeSafe('popupFactoryIsPointerOver', {id: this._id}, false);
     }
 
     // Private

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2017-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -19,6 +19,7 @@
 import {RequestBuilder} from '../background/request-builder.js';
 import {ExtensionError} from '../core/extension-error.js';
 import {readResponseJson} from '../core/json.js';
+import {arrayBufferDigest} from '../core/utilities.js';
 import {arrayBufferToBase64} from '../data/array-buffer-util.js';
 import {JsonSchema} from '../data/json-schema.js';
 import {NativeSimpleDOMParser} from '../dom/native-simple-dom-parser.js';
@@ -86,11 +87,12 @@ export class AudioDownloader {
      * @param {string} reading
      * @param {?number} idleTimeout
      * @param {import('language').LanguageSummary} languageSummary
+     * @param {boolean} enableDefaultAudioSources
      * @returns {Promise<import('audio-downloader').AudioBinaryBase64>}
      */
-    async downloadTermAudio(sources, preferredAudioIndex, term, reading, idleTimeout, languageSummary) {
+    async downloadTermAudio(sources, preferredAudioIndex, term, reading, idleTimeout, languageSummary, enableDefaultAudioSources) {
         const errors = [];
-        const requiredAudioSources = this._getRequiredAudioSources(languageSummary.iso, sources);
+        const requiredAudioSources = enableDefaultAudioSources ? getRequiredAudioSources(languageSummary.iso, sources) : [];
         for (const source of [...sources, ...requiredAudioSources]) {
             let infoList = await this.getTermAudioInfoList(source, term, reading, languageSummary);
             if (typeof preferredAudioIndex === 'number') {
@@ -115,32 +117,6 @@ export class AudioDownloader {
     }
 
     // Private
-
-    /**
-     * @param {string} language
-     * @param {import('audio').AudioSourceInfo[]} sources
-     * @returns {import('audio').AudioSourceInfo[]}
-     */
-    _getRequiredAudioSources(language, sources) {
-        /** @type {Set<import('settings').AudioSourceType>} */
-        const requiredSources = language === 'ja' ?
-            new Set([
-                'jpod101',
-                'language-pod-101',
-                'jisho',
-            ]) :
-            new Set([
-                'lingua-libre',
-                'language-pod-101',
-                'wiktionary',
-            ]);
-
-        for (const {type} of sources) {
-            requiredSources.delete(type);
-        }
-
-        return [...requiredSources].map((type) => ({type, url: '', voice: ''}));
-    }
 
     /**
      * @param {string} url
@@ -445,7 +421,7 @@ export class AudioDownloader {
     }
 
     /** @type {import('audio-downloader').GetInfoHandler} */
-    async _getInfoCustom(term, reading, details) {
+    async _getInfoCustom(term, reading, details, languageSummary) {
         if (typeof details !== 'object' || details === null) {
             throw new Error('Invalid arguments');
         }
@@ -453,12 +429,12 @@ export class AudioDownloader {
         if (typeof url !== 'string') {
             throw new Error('Invalid url');
         }
-        url = this._getCustomUrl(term, reading, url);
+        url = this._getCustomUrl(term, reading, url, languageSummary);
         return [{type: 'url', url}];
     }
 
     /** @type {import('audio-downloader').GetInfoHandler} */
-    async _getInfoCustomJson(term, reading, details) {
+    async _getInfoCustomJson(term, reading, details, languageSummary) {
         if (typeof details !== 'object' || details === null) {
             throw new Error('Invalid arguments');
         }
@@ -466,7 +442,7 @@ export class AudioDownloader {
         if (typeof url !== 'string') {
             throw new Error('Invalid url');
         }
-        url = this._getCustomUrl(term, reading, url);
+        url = this._getCustomUrl(term, reading, url, languageSummary);
 
         const response = await this._requestBuilder.fetchAnonymous(url, DEFAULT_REQUEST_INIT_PARAMS);
 
@@ -498,14 +474,19 @@ export class AudioDownloader {
      * @param {string} term
      * @param {string} reading
      * @param {string} url
+     * @param {import('language').LanguageSummary} languageSummary
      * @returns {string}
      * @throws {Error}
      */
-    _getCustomUrl(term, reading, url) {
+    _getCustomUrl(term, reading, url, languageSummary) {
         if (typeof url !== 'string') {
             throw new Error('No custom URL defined');
         }
-        const data = {term, reading};
+        const data = {
+            term,
+            reading,
+            language: languageSummary.iso,
+        };
         /**
          * @param {string} m0
          * @param {string} m1
@@ -513,7 +494,7 @@ export class AudioDownloader {
          */
         const replacer = (m0, m1) => (
             Object.prototype.hasOwnProperty.call(data, m1) ?
-            `${data[/** @type {'term'|'reading'} */ (m1)]}` :
+            `${data[/** @type {'term'|'reading'|'language'} */ (m1)]}` :
             m0
         );
         return url.replace(/\{([^}]*)\}/g, replacer);
@@ -579,7 +560,7 @@ export class AudioDownloader {
         switch (sourceType) {
             case 'jpod101':
             {
-                const digest = await this._arrayBufferDigest(arrayBuffer);
+                const digest = await arrayBufferDigest('SHA-256', arrayBuffer);
                 switch (digest) {
                     case 'ae6398b5a27bc8c0a771df6c907ade794be15518174773c58c7c7ddd17098906': // Invalid audio
                         return false;
@@ -590,19 +571,6 @@ export class AudioDownloader {
             default:
                 return true;
         }
-    }
-
-    /**
-     * @param {ArrayBuffer} arrayBuffer
-     * @returns {Promise<string>}
-     */
-    async _arrayBufferDigest(arrayBuffer) {
-        const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(arrayBuffer)));
-        let digest = '';
-        for (const byte of hash) {
-            digest += byte.toString(16).padStart(2, '0');
-        }
-        return digest;
     }
 
     /**
@@ -631,4 +599,38 @@ export class AudioDownloader {
         });
         return await readResponseJson(response);
     }
+}
+
+/**
+ * @param {string} language
+ * @returns {Set<import('settings').AudioSourceType>}
+ */
+export function getRequiredAudioSourceList(language) {
+    return language === 'ja' ?
+        new Set([
+            'jpod101',
+            'language-pod-101',
+            'jisho',
+        ]) :
+        new Set([
+            'lingua-libre',
+            'language-pod-101',
+            'wiktionary',
+        ]);
+}
+
+/**
+ * @param {string} language
+ * @param {import('audio').AudioSourceInfo[]} sources
+ * @returns {import('audio').AudioSourceInfo[]}
+ */
+export function getRequiredAudioSources(language, sources) {
+    /** @type {Set<import('settings').AudioSourceType>} */
+    const requiredSources = getRequiredAudioSourceList(language);
+
+    for (const {type} of sources) {
+        requiredSources.delete(type);
+    }
+
+    return [...requiredSources].map((type) => ({type, url: '', voice: ''}));
 }

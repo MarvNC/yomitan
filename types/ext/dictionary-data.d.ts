@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,11 +19,14 @@ import type * as StructuredContent from './structured-content';
 
 export type IndexVersion = 1 | 2 | 3;
 
+export type FrequencyMode = 'occurrence-based' | 'rank-based';
+
 export type Index = {
     format?: IndexVersion;
     version?: IndexVersion;
     title: string;
     revision: string;
+    minimumYomitanVersion?: string;
     sequenced?: boolean;
     isUpdatable?: true;
     indexUrl?: string;
@@ -34,7 +37,7 @@ export type Index = {
     attribution?: string;
     sourceLanguage?: string;
     targetLanguage?: string;
-    frequencyMode?: 'occurrence-based' | 'rank-based';
+    frequencyMode?: FrequencyMode;
     tagMeta?: IndexTagMeta;
 };
 
@@ -161,7 +164,7 @@ export type TermMetaFrequency = [
 export type TermMetaPitchData = {
     reading: string;
     pitches: {
-        position: number;
+        position: number | string;
         nasal?: number | number[];
         devoice?: number | number[];
         tags?: string[];

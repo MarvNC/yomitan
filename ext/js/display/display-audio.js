@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2021-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -19,6 +19,7 @@
 import {EventListenerCollection} from '../core/event-listener-collection.js';
 import {PopupMenu} from '../dom/popup-menu.js';
 import {querySelectorNotNull} from '../dom/query-selector.js';
+import {getRequiredAudioSourceList} from '../media/audio-downloader.js';
 import {AudioSystem} from '../media/audio-system.js';
 
 export class DisplayAudio {
@@ -36,6 +37,8 @@ export class DisplayAudio {
         this._playbackVolume = 1;
         /** @type {boolean} */
         this._autoPlay = false;
+        /** @type {import('settings').FallbackSoundType} */
+        this._fallbackSoundType = 'none';
         /** @type {?import('core').Timeout} */
         this._autoPlayAudioTimer = null;
         /** @type {number} */
@@ -64,6 +67,8 @@ export class DisplayAudio {
             ['custom', 'Custom URL'],
             ['custom-json', 'Custom URL (JSON)'],
         ]);
+        /** @type {?boolean} */
+        this._enableDefaultAudioSources = null;
         /** @type {(event: MouseEvent) => void} */
         this._onAudioPlayButtonClickBind = this._onAudioPlayButtonClick.bind(this);
         /** @type {(event: MouseEvent) => void} */
@@ -157,7 +162,8 @@ export class DisplayAudio {
                 sources.push(this._getSourceData(source));
             }
         }
-        return {sources, preferredAudioIndex};
+        const enableDefaultAudioSources = this._enableDefaultAudioSources ?? false;
+        return {sources, preferredAudioIndex, enableDefaultAudioSources};
     }
 
     // Private
@@ -168,13 +174,15 @@ export class DisplayAudio {
     _onOptionsUpdated({options}) {
         const {
             general: {language},
-            audio: {enabled, autoPlay, volume, sources},
+            audio: {enabled, autoPlay, fallbackSoundType, volume, sources, enableDefaultAudioSources},
         } = options;
         this._autoPlay = enabled && autoPlay;
+        this._fallbackSoundType = fallbackSoundType;
         this._playbackVolume = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume / 100)) : 1;
+        this._enableDefaultAudioSources = enableDefaultAudioSources;
 
         /** @type {Set<import('settings').AudioSourceType>} */
-        const requiredAudioSources = this._getRequiredAudioSources(language);
+        const requiredAudioSources = enableDefaultAudioSources ? getRequiredAudioSourceList(language) : new Set();
         /** @type {Map<string, import('display-audio').AudioSource[]>} */
         const nameMap = new Map();
         this._audioSources.length = 0;
@@ -190,24 +198,6 @@ export class DisplayAudio {
         data.audioEnabled = enabled.toString();
 
         this._cache.clear();
-    }
-
-    /**
-     * @param {string} language
-     * @returns {Set<import('settings').AudioSourceType>}
-     */
-    _getRequiredAudioSources(language) {
-        return language === 'ja' ?
-            new Set([
-                'jpod101',
-                'language-pod-101',
-                'jisho',
-            ]) :
-            new Set([
-                'lingua-libre',
-                'language-pod-101',
-                'wiktionary',
-            ]);
     }
 
     /** */
@@ -451,7 +441,7 @@ export class DisplayAudio {
                 const sourceIndex = sources.indexOf(source);
                 title = `From source ${1 + sourceIndex}: ${source.name}`;
             } else {
-                audio = this._audioSystem.getFallbackAudio();
+                audio = this._audioSystem.getFallbackAudio(this._fallbackSoundType);
                 title = 'Could not find audio';
             }
 

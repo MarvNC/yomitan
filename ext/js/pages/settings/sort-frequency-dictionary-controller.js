@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2021-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -142,20 +142,55 @@ export class SortFrequencyDictionaryController {
      */
     async _autoUpdateOrder(dictionary) {
         const order = await this._getFrequencyOrder(dictionary);
-        if (order === 0) { return; }
-        const value = (order > 0 ? 'descending' : 'ascending');
-        /** @type {HTMLSelectElement} */ (this._sortFrequencyDictionaryOrderSelect).value = value;
-        await this._setSortFrequencyDictionaryOrderValue(value);
+        if (order === null) { return; }
+        /** @type {HTMLSelectElement} */ (this._sortFrequencyDictionaryOrderSelect).value = order;
+        await this._setSortFrequencyDictionaryOrderValue(order);
     }
 
     /**
      * @param {string} dictionary
-     * @returns {Promise<number>}
+     * @returns {Promise<import('settings').SortFrequencyDictionaryOrder?>}
      */
     async _getFrequencyOrder(dictionary) {
-        const moreCommonTerms = ['来る', '言う', '出る', '入る', '方', '男', '女', '今', '何', '時'];
-        const lessCommonTerms = ['行なう', '論じる', '過す', '行方', '人口', '猫', '犬', '滝', '理', '暁'];
-        const terms = [...moreCommonTerms, ...lessCommonTerms];
+        const dictionaryInfo = await this._settingsController.application.api.getDictionaryInfo();
+        const dictionaryFrequencyMode = dictionaryInfo.find(({title}) => title === dictionary)?.frequencyMode ?? '';
+        switch (dictionaryFrequencyMode) {
+            case 'occurrence-based': {
+                return 'descending';
+            }
+            case 'rank-based': {
+                return 'ascending';
+            }
+        }
+
+        const dictionaryLang = dictionaryInfo.find(({title}) => title === dictionary)?.sourceLanguage ?? '';
+
+        /** @type {Record<string, string[]>} */
+        const moreCommonTerms = {
+            ja: ['来る', '言う', '出る', '入る', '方', '男', '女', '今', '何', '時'],
+        };
+        /** @type {Record<string, string[]>} */
+        const lessCommonTerms = {
+            ja: ['行なう', '論じる', '過す', '行方', '人口', '猫', '犬', '滝', '理', '暁'],
+        };
+        let langMoreCommonTerms = moreCommonTerms[dictionaryLang];
+        let langLessCommonTerms = lessCommonTerms[dictionaryLang];
+        if (dictionaryLang === '') {
+            langMoreCommonTerms = [];
+            for (const key in moreCommonTerms) {
+                if (Object.hasOwn(moreCommonTerms, key)) {
+                    langMoreCommonTerms.push(...moreCommonTerms[key]);
+                }
+            }
+            langLessCommonTerms = [];
+            for (const key in lessCommonTerms) {
+                if (Object.hasOwn(lessCommonTerms, key)) {
+                    langLessCommonTerms.push(...lessCommonTerms[key]);
+                }
+            }
+        }
+
+        const terms = [...langMoreCommonTerms, ...langLessCommonTerms];
 
         const frequencies = await this._settingsController.application.api.getTermFrequencies(
             terms.map((term) => ({term, reading: null})),
@@ -166,12 +201,12 @@ export class SortFrequencyDictionaryController {
         const termDetails = new Map();
         const moreCommonTermDetails = [];
         const lessCommonTermDetails = [];
-        for (const term of moreCommonTerms) {
+        for (const term of langMoreCommonTerms) {
             const details = {hasValue: false, minValue: Number.MAX_SAFE_INTEGER, maxValue: Number.MIN_SAFE_INTEGER};
             termDetails.set(term, details);
             moreCommonTermDetails.push(details);
         }
-        for (const term of lessCommonTerms) {
+        for (const term of langLessCommonTerms) {
             const details = {hasValue: false, minValue: Number.MAX_SAFE_INTEGER, maxValue: Number.MIN_SAFE_INTEGER};
             termDetails.set(term, details);
             lessCommonTermDetails.push(details);
@@ -193,7 +228,11 @@ export class SortFrequencyDictionaryController {
                 result += Math.sign(details1.maxValue - details2.minValue) + Math.sign(details1.minValue - details2.maxValue);
             }
         }
-        return Math.sign(result);
+
+        const resultSign = Math.sign(result);
+        if (resultSign > 0) { return 'descending'; }
+        if (resultSign < 0) { return 'ascending'; }
+        return null;
     }
 
     /**

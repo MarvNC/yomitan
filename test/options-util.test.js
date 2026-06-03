@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2020-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -43,6 +43,7 @@ function createProfileOptionsTestData1() {
             maxResults: 32,
             showAdvanced: false,
             popupDisplayMode: 'default',
+            popupFullWidthPosition: 'bottom',
             popupWidth: 400,
             popupHeight: 250,
             popupHorizontalOffset: 0,
@@ -56,6 +57,7 @@ function createProfileOptionsTestData1() {
             popupScaleRelativeToVisualViewport: true,
             showGuide: true,
             compactTags: false,
+            averageFrequency: false,
             compactGlossaries: false,
             mainDictionary: '',
             popupTheme: 'default',
@@ -76,12 +78,12 @@ function createProfileOptionsTestData1() {
             sources: ['jpod101', 'text-to-speech', 'custom', 'jpod101-alternate'],
             volume: 100,
             autoPlay: false,
+            fallbackSoundType: 'click',
             customSourceUrl: 'http://localhost/audio.mp3?term={expression}&reading={reading}',
             textToSpeechVoice: 'example-voice',
         },
         scanning: {
             middleMouse: true,
-            touchInputEnabled: true,
             selectText: true,
             alphanumeric: true,
             autoHideResults: false,
@@ -89,7 +91,7 @@ function createProfileOptionsTestData1() {
             length: 10,
             modifier: 'shift',
             deepDomScan: false,
-            popupNestingMaxDepth: 0,
+            popupNestingMaxDepth: 10,
             enablePopupSearch: false,
             enableOnPopupExpressions: false,
             enableOnSearchPage: true,
@@ -106,7 +108,17 @@ function createProfileOptionsTestData1() {
             collapseEmphaticSequences: 'false',
         },
         dictionaries: {
-            'Test Dictionary': {
+            'Test Dictionary 1': {
+                priority: 0,
+                enabled: true,
+                allowSecondarySearches: false,
+            },
+            'Test Dictionary 2': {
+                priority: 1,
+                enabled: true,
+                allowSecondarySearches: false,
+            },
+            'Test Dictionary 3': {
                 priority: 0,
                 enabled: true,
                 allowSecondarySearches: false,
@@ -264,6 +276,7 @@ function createProfileOptionsUpdatedTestData1() {
             showAdvanced: false,
             showDebug: false,
             popupDisplayMode: 'default',
+            popupFullWidthPosition: 'bottom',
             popupWidth: 400,
             popupHeight: 250,
             popupHorizontalOffset: 0,
@@ -278,6 +291,7 @@ function createProfileOptionsUpdatedTestData1() {
             showGuide: true,
             enableContextMenuScanSelected: true,
             compactTags: false,
+            averageFrequency: false,
             glossaryLayoutMode: 'default',
             mainDictionary: '',
             popupTheme: 'light',
@@ -300,6 +314,9 @@ function createProfileOptionsUpdatedTestData1() {
             sortFrequencyDictionary: null,
             sortFrequencyDictionaryOrder: 'descending',
             stickySearchHeader: false,
+            enableYomitanApi: false,
+            yomitanApiServer: 'http://127.0.0.1:19633',
+            yomitanApiAllowCssSanitizationBypass: false,
         },
         audio: {
             enabled: true,
@@ -327,28 +344,39 @@ function createProfileOptionsUpdatedTestData1() {
             ],
             volume: 100,
             autoPlay: false,
+            fallbackSoundType: 'click',
+            enableDefaultAudioSources: true,
         },
         scanning: {
-            touchInputEnabled: true,
             selectText: true,
             alphanumeric: true,
             autoHideResults: false,
             delay: 20,
             length: 10,
             deepDomScan: false,
-            popupNestingMaxDepth: 0,
+            popupNestingMaxDepth: 10,
             enablePopupSearch: false,
             enableOnPopupExpressions: false,
             enableOnSearchPage: true,
             enableSearchTags: false,
             layoutAwareScan: false,
             hideDelay: 0,
-            pointerEventsEnabled: false,
             matchTypePrefix: false,
             hidePopupOnCursorExit: false,
             hidePopupOnCursorExitDelay: 0,
+            reducedMotionScrolling: false,
+            reducedMotionScrollingScale: 1,
+            reducedMotionScrollingSwipeThreshold: 40,
             normalizeCssZoom: true,
             preventMiddleMouse: {
+                onTextHover: false,
+                onWebPages: false,
+                onPopupPages: false,
+                onSearchPages: false,
+                onSearchQuery: false,
+            },
+            preventBackForward: {
+                onTextHover: false,
                 onWebPages: false,
                 onPopupPages: false,
                 onSearchPages: false,
@@ -374,12 +402,13 @@ function createProfileOptionsUpdatedTestData1() {
                         scanOnTouchPress: false,
                         scanOnTouchRelease: false,
                         scanOnPenMove: true,
-                        scanOnPenHover: true,
+                        scanOnPenHover: false,
                         scanOnPenReleaseHover: false,
                         scanOnPenPress: true,
                         scanOnPenRelease: false,
                         preventTouchScrolling: true,
                         preventPenScrolling: true,
+                        minimumTouchTime: 0,
                     },
                 },
                 {
@@ -399,12 +428,13 @@ function createProfileOptionsUpdatedTestData1() {
                         scanOnTouchPress: false,
                         scanOnTouchRelease: false,
                         scanOnPenMove: true,
-                        scanOnPenHover: true,
+                        scanOnPenHover: false,
                         scanOnPenReleaseHover: false,
                         scanOnPenPress: true,
                         scanOnPenRelease: false,
                         preventTouchScrolling: true,
                         preventPenScrolling: true,
+                        minimumTouchTime: 0,
                     },
                 },
                 {
@@ -424,12 +454,13 @@ function createProfileOptionsUpdatedTestData1() {
                         scanOnTouchPress: false,
                         scanOnTouchRelease: false,
                         scanOnPenMove: true,
-                        scanOnPenHover: true,
+                        scanOnPenHover: false,
                         scanOnPenReleaseHover: false,
                         scanOnPenPress: true,
                         scanOnPenRelease: false,
                         preventTouchScrolling: true,
                         preventPenScrolling: true,
+                        minimumTouchTime: 0,
                     },
                 },
             ],
@@ -443,9 +474,26 @@ function createProfileOptionsUpdatedTestData1() {
         },
         dictionaries: [
             {
-                name: 'Test Dictionary',
-                alias: 'Test Dictionary',
-                priority: 0,
+                name: 'Test Dictionary 2',
+                alias: 'Test Dictionary 2',
+                enabled: true,
+                allowSecondarySearches: false,
+                definitionsCollapsible: 'not-collapsible',
+                partsOfSpeechFilter: true,
+                useDeinflections: true,
+            },
+            {
+                name: 'Test Dictionary 1',
+                alias: 'Test Dictionary 1',
+                enabled: true,
+                allowSecondarySearches: false,
+                definitionsCollapsible: 'not-collapsible',
+                partsOfSpeechFilter: true,
+                useDeinflections: true,
+            },
+            {
+                name: 'Test Dictionary 3',
+                alias: 'Test Dictionary 3',
                 enabled: true,
                 allowSecondarySearches: false,
                 definitionsCollapsible: 'not-collapsible',
@@ -465,30 +513,44 @@ function createProfileOptionsUpdatedTestData1() {
             server: 'http://127.0.0.1:8765',
             tags: ['yomitan'],
             screenshot: {format: 'png', quality: 92},
-            terms: {
+            cardFormats: [{
+                type: 'term',
+                name: 'Expression',
+                icon: 'big-circle',
                 deck: '',
                 model: '',
                 fields: {
-                    expression: '{popup-selection-text}',
+                    expression: {
+                        overwriteMode: 'coalesce',
+                        value: '{popup-selection-text}',
+                    },
                 },
-            },
-            kanji: {
+            }, {
+                type: 'kanji',
+                name: 'Kanji',
+                icon: 'big-circle',
                 deck: '',
                 model: '',
                 fields: {
-                    expression: '{popup-selection-text}',
+                    expression: {
+                        overwriteMode: 'coalesce',
+                        value: '{popup-selection-text}',
+                    },
                 },
-            },
+            }],
             duplicateBehavior: 'new',
             duplicateScope: 'collection',
             duplicateScopeCheckAllModels: false,
-            displayTags: 'never',
+            displayTagsAndFlags: 'never',
+            targetTags: [],
             checkForDuplicates: true,
             fieldTemplates: null,
             suspendNewCards: false,
             noteGuiMode: 'browse',
             apiKey: '',
             downloadTimeout: 0,
+            forceSync: false,
+            noteDupeCheckFirst: false,
         },
         sentenceParsing: {
             scanExtent: 200,
@@ -525,11 +587,11 @@ function createProfileOptionsUpdatedTestData1() {
                 {action: 'nextEntry',         argument: '1', key: 'ArrowDown', modifiers: ['alt'],  scopes: ['popup', 'search'], enabled: true},
                 {action: 'historyBackward',   argument: '',  key: 'KeyB',      modifiers: ['alt'],  scopes: ['popup', 'search'], enabled: true},
                 {action: 'historyForward',    argument: '',  key: 'KeyF',      modifiers: ['alt'],  scopes: ['popup', 'search'], enabled: true},
-                {action: 'addNoteKanji',      argument: '',  key: 'KeyK',      modifiers: ['alt'],  scopes: ['popup', 'search'], enabled: true},
-                {action: 'addNoteTermKanji',  argument: '',  key: 'KeyE',      modifiers: ['alt'],  scopes: ['popup', 'search'], enabled: true},
-                {action: 'addNoteTermKana',   argument: '',  key: 'KeyR',      modifiers: ['alt'],  scopes: ['popup', 'search'], enabled: true},
+                {action: 'addNote',           argument: '1', key: 'KeyK',      modifiers: ['alt'],  scopes: ['popup', 'search'], enabled: true},
+                {action: 'addNote',           argument: '0', key: 'KeyE',      modifiers: ['alt'],  scopes: ['popup', 'search'], enabled: true},
+                {action: 'addNote',           argument: '1', key: 'KeyR',      modifiers: ['alt'],  scopes: ['popup', 'search'], enabled: true},
                 {action: 'playAudio',         argument: '',  key: 'KeyP',      modifiers: ['alt'],  scopes: ['popup', 'search'], enabled: true},
-                {action: 'viewNotes',         argument: '',  key: 'KeyV',      modifiers: ['alt'],  scopes: ['popup', 'search'], enabled: true},
+                {action: 'viewNotes',         argument: '0', key: 'KeyV',      modifiers: ['alt'],  scopes: ['popup', 'search'], enabled: true},
                 {action: 'copyHostSelection', argument: '',  key: 'KeyC',      modifiers: ['ctrl'], scopes: ['popup'], enabled: true},
                 {action: 'profilePrevious',   argument: '',  key: 'Minus',     modifiers: ['alt'],  scopes: ['popup', 'search', 'web'], enabled: true},
                 {action: 'profileNext',       argument: '',  key: 'Equal',     modifiers: ['alt'],  scopes: ['popup', 'search', 'web'], enabled: true},
@@ -565,6 +627,7 @@ function createOptionsUpdatedTestData1() {
     return {
         profiles: [
             {
+                id: 'profile-0',
                 name: 'Default',
                 options: createProfileOptionsUpdatedTestData1(),
                 conditionGroups: [
@@ -644,11 +707,12 @@ function createOptionsUpdatedTestData1() {
             },
         ],
         profileCurrent: 0,
-        version: 52,
+        version: 76,
         global: {
             database: {
                 prefixWildcardsSupported: false,
             },
+            dataTransmissionConsentShown: false,
         },
     };
 }
@@ -1954,6 +2018,77 @@ describe('OptionsUtil', () => {
             </li>
         {{~/each~}}
         </ul>
+    {{~/if~}}
+{{/inline}}
+`.trimStart(),
+            },
+            {
+                oldVersion: 74,
+                newVersion: 75,
+                old: `
+{{#*inline "frequency-harmonic-rank"}}
+    {{~#if (op "===" definition.frequencyHarmonic -1) ~}}
+        9999999
+    {{~else ~}}
+        {{definition.frequencyHarmonic}}
+    {{~/if~}}
+{{/inline}}
+
+{{#*inline "frequency-harmonic-occurrence"}}
+    {{~#if (op "===" definition.frequencyHarmonic -1) ~}}
+        0
+    {{~else ~}}
+        {{definition.frequencyHarmonic}}
+    {{~/if~}}
+{{/inline}}
+
+{{#*inline "frequency-average-rank"}}
+    {{~#if (op "===" definition.frequencyAverage -1) ~}}
+        9999999
+    {{~else ~}}
+        {{definition.frequencyAverage}}
+    {{~/if~}}
+{{/inline}}
+
+{{#*inline "frequency-average-occurrence"}}
+    {{~#if (op "===" definition.frequencyAverage -1) ~}}
+        0
+    {{~else ~}}
+        {{definition.frequencyAverage}}
+    {{~/if~}}
+{{/inline}}
+`.trimStart(),
+
+                expected: `
+{{#*inline "frequency-harmonic-rank"}}
+    {{~#if (op "===" definition.frequencyHarmonicRank -1) ~}}
+        9999999
+    {{~else ~}}
+        {{definition.frequencyHarmonicRank}}
+    {{~/if~}}
+{{/inline}}
+
+{{#*inline "frequency-harmonic-occurrence"}}
+    {{~#if (op "===" definition.frequencyHarmonicOccurrence -1) ~}}
+        0
+    {{~else ~}}
+        {{definition.frequencyHarmonicOccurrence}}
+    {{~/if~}}
+{{/inline}}
+
+{{#*inline "frequency-average-rank"}}
+    {{~#if (op "===" definition.frequencyAverageRank -1) ~}}
+        9999999
+    {{~else ~}}
+        {{definition.frequencyAverageRank}}
+    {{~/if~}}
+{{/inline}}
+
+{{#*inline "frequency-average-occurrence"}}
+    {{~#if (op "===" definition.frequencyAverageOccurrence -1) ~}}
+        0
+    {{~else ~}}
+        {{definition.frequencyAverageOccurrence}}
     {{~/if~}}
 {{/inline}}
 `.trimStart(),

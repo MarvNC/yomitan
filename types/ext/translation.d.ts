@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -48,10 +48,6 @@ export type FindKanjiDictionary = {
      * The alias of the dictionary
      */
     alias: string;
-    /**
-     * The priority of the dictionary
-     */
-    priority: number;
 };
 
 // Terms
@@ -68,6 +64,10 @@ export type FindTermsOptions = {
      * Whether or not deinflection should be performed.
      */
     deinflect: boolean;
+    /**
+     * The reading which will be sorted to the top of the results, if provided as a query parameter.
+     */
+    primaryReading: string;
     /**
      * The name of the primary dictionary to search.
      */
@@ -105,6 +105,10 @@ export type FindTermsOptions = {
      * ISO-639 code of the language.
      */
     language: string;
+    /**
+     * Whether to force using using all frequency dictionaries, even in 'simple' FindTermsMode mode.
+     */
+    useAllFrequencyDictionaries: boolean;
 };
 
 /**
@@ -148,10 +152,6 @@ export type FindTermDictionary = {
      * The alias of the dictionary
      */
     alias: string;
-    /**
-     * The priority of the dictionary
-     */
-    priority: number;
     /**
      * Whether or not secondary term searches are allowed for this dictionary.
      */

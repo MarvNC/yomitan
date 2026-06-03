@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024  Yomitan Authors
+ * Copyright (C) 2024-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,14 +16,21 @@
  */
 
 import {isStringPartiallyJapanese} from './ja/japanese.js';
+import {isStringPartiallyChinese} from './zh/chinese.js';
 
 /**
  * Returns the language that the string might be by using some heuristic checks.
  * Values returned are ISO codes. `null` is returned if no language can be determined.
  * @param {string} text
+ * @param {?string} language
  * @returns {?string}
  */
-export function getLanguageFromText(text) {
-    if (isStringPartiallyJapanese(text)) { return 'ja'; }
-    return null;
+export function getLanguageFromText(text, language) {
+    const partiallyJapanese = isStringPartiallyJapanese(text);
+    const partiallyChinese = isStringPartiallyChinese(text);
+    if (!['zh', 'yue'].includes(language ?? '')) {
+        if (partiallyJapanese) { return 'ja'; }
+        if (partiallyChinese) { return 'zh'; }
+    }
+    return language;
 }

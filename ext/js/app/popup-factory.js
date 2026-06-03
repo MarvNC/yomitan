@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2019-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -63,6 +63,7 @@ export class PopupFactory {
             ['popupFactorySetCustomOuterCss',    this._onApiSetCustomOuterCss.bind(this)],
             ['popupFactoryGetFrameSize',         this._onApiGetFrameSize.bind(this)],
             ['popupFactorySetFrameSize',         this._onApiSetFrameSize.bind(this)],
+            ['popupFactoryIsPointerOver',        this._onApiIsPointerOver.bind(this)],
         ]);
         /* eslint-enable @stylistic/no-multi-spaces */
     }
@@ -188,7 +189,7 @@ export class PopupFactory {
             promises.push(promise);
         }
 
-        /** @type {undefined|unknown} */
+        /** @type {undefined|Error} */
         let error = void 0;
         /** @type {{popup: import('popup').PopupAny, token: string}[]} */
         const results = [];
@@ -349,6 +350,12 @@ export class PopupFactory {
     async _onApiSetFrameSize({id, width, height}) {
         const popup = this._getPopup(id);
         return await popup.setFrameSize(width, height);
+    }
+
+    /** @type {import('cross-frame-api').ApiHandler<'popupFactoryIsPointerOver'>} */
+    async _onApiIsPointerOver({id}) {
+        const popup = this._getPopup(id);
+        return popup.isPointerOver();
     }
 
     // Private functions

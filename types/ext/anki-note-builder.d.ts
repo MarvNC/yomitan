@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,12 +28,9 @@ import type * as Language from './language';
 
 export type CreateNoteDetails = {
     dictionaryEntry: Dictionary.DictionaryEntry;
-    mode: AnkiTemplatesInternal.CreateMode;
+    cardFormat: Settings.AnkiCardFormat;
     context: AnkiTemplatesInternal.Context;
     template: string;
-    deckName: string;
-    modelName: string;
-    fields: Field[];
     tags: string[];
     requirements: Requirement[];
     duplicateScope: Settings.AnkiDuplicateScope;
@@ -47,7 +44,10 @@ export type CreateNoteDetails = {
 
 export type Field = [
     name: string,
-    value: string,
+    {
+        value: string;
+        overwriteMode: Settings.AnkiNoteFieldOverwriteMode;
+    },
 ];
 
 export type CreateNoteResult = {
@@ -58,7 +58,7 @@ export type CreateNoteResult = {
 
 export type GetRenderingDataDetails = {
     dictionaryEntry: Dictionary.DictionaryEntry;
-    mode: AnkiTemplatesInternal.CreateMode;
+    cardFormat: Settings.AnkiCardFormat;
     context: AnkiTemplatesInternal.Context;
     resultOutputMode?: Settings.ResultOutputMode;
     glossaryLayoutMode?: Settings.GlossaryLayoutMode;
@@ -79,6 +79,8 @@ export type RequirementTextFurigana = {
     readingMode: AnkiTemplates.TextFuriganaReadingMode;
 };
 
+export type TextFuriganaFormats = 'furiganaHtml' | 'furiganaPlain';
+
 export type RequirementDictionaryMedia = {
     type: 'dictionaryMedia';
     dictionary: string;
@@ -92,6 +94,7 @@ export type AudioMediaOptions = {
     preferredAudioIndex: number | null;
     idleTimeout: number | null;
     languageSummary: Language.LanguageSummary;
+    enableDefaultAudioSources: boolean;
 };
 
 export type MediaOptions = {
@@ -139,5 +142,6 @@ export type MinimalApi = {
         scanLength: Api.ApiParam<'parseText', 'scanLength'>,
         useInternalParser: Api.ApiParam<'parseText', 'useInternalParser'>,
         useMecabParser: Api.ApiParam<'parseText', 'useMecabParser'>,
+        useAllFrequencyDictionaries: Api.ApiParam<'parseText', 'useAllFrequencyDictionaries'>,
     ): Promise<Api.ApiReturn<'parseText'>>;
 };

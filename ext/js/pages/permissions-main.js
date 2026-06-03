@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2020-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -113,8 +113,6 @@ await Application.main(true, async (application) => {
     /** @type {HTMLInputElement} */
     const permissionCheckbox2 = querySelectorNotNull(document, '#permission-checkbox-allow-file-url-access');
     /** @type {HTMLInputElement[]} */
-    // This collection is actually used, not sure why this eslint-disable is needed.
-    // eslint-disable-next-line sonarjs/no-unused-collection
     const permissionsCheckboxes = [permissionCheckbox1, permissionCheckbox2];
 
     const permissions = await Promise.all([

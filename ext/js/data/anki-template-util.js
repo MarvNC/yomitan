@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024  Yomitan Authors
+ * Copyright (C) 2024-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,18 +18,18 @@
 /**
  * Gets a list of field markers from the standard Handlebars template.
  * @param {import('dictionary').DictionaryEntryType} type What type of dictionary entry to get the fields for.
+ * @param {string} language
  * @returns {string[]} The list of field markers.
  * @throws {Error}
  */
-export function getStandardFieldMarkers(type) {
+export function getStandardFieldMarkers(type, language = 'ja') {
     switch (type) {
-        case 'term':
-            return [
+        case 'term': {
+            const markers = [
                 'audio',
                 'clipboard-image',
                 'clipboard-text',
                 'cloze-body',
-                'cloze-body-kana',
                 'cloze-prefix',
                 'cloze-suffix',
                 'conjugation',
@@ -47,15 +47,12 @@ export function getStandardFieldMarkers(type) {
                 'glossary',
                 'glossary-brief',
                 'glossary-no-dictionary',
+                'glossary-plain',
+                'glossary-plain-no-dictionary',
                 'glossary-first',
                 'glossary-first-brief',
                 'glossary-first-no-dictionary',
                 'part-of-speech',
-                'pitch-accents',
-                'pitch-accent-graphs',
-                'pitch-accent-graphs-jj',
-                'pitch-accent-positions',
-                'pitch-accent-categories',
                 'phonetic-transcriptions',
                 'reading',
                 'screenshot',
@@ -63,9 +60,22 @@ export function getStandardFieldMarkers(type) {
                 'popup-selection-text',
                 'sentence',
                 'sentence-furigana',
+                'sentence-furigana-plain',
                 'tags',
                 'url',
             ];
+            if (language === 'ja') {
+                markers.push(
+                    'cloze-body-kana',
+                    'pitch-accents',
+                    'pitch-accent-graphs',
+                    'pitch-accent-graphs-jj',
+                    'pitch-accent-positions',
+                    'pitch-accent-categories',
+                );
+            }
+            return markers;
+        }
         case 'kanji':
             return [
                 'character',
@@ -91,6 +101,7 @@ export function getStandardFieldMarkers(type) {
                 'popup-selection-text',
                 'sentence',
                 'sentence-furigana',
+                'sentence-furigana-plain',
                 'stroke-count',
                 'tags',
                 'url',
@@ -102,13 +113,17 @@ export function getStandardFieldMarkers(type) {
 
 /**
  * @param {import('settings').ProfileOptions} options
+ * @param {import('dictionary-importer').Summary[]} dictionaryInfo
  * @returns {string}
  */
-export function getDynamicTemplates(options) {
+export function getDynamicTemplates(options, dictionaryInfo) {
     let dynamicTemplates = '\n';
     for (const dictionary of options.dictionaries) {
+        const currentDictionaryInfo = dictionaryInfo.find(({title}) => title === dictionary.name);
         if (!dictionary.enabled) { continue; }
-        dynamicTemplates += `
+        const totalTerms = currentDictionaryInfo?.counts?.terms?.total;
+        if (totalTerms && totalTerms > 0) {
+            dynamicTemplates += `
 {{#*inline "single-glossary-${getKebabCase(dictionary.name)}"}}
     {{~> glossary selectedDictionary='${escapeDictName(dictionary.name)}'}}
 {{/inline}}
@@ -120,20 +135,49 @@ export function getDynamicTemplates(options) {
 {{#*inline "single-glossary-${getKebabCase(dictionary.name)}-brief"}}
     {{~> glossary selectedDictionary='${escapeDictName(dictionary.name)}' brief=true}}
 {{/inline}}
+
+{{#*inline "single-glossary-${getKebabCase(dictionary.name)}-plain"}}
+    {{~> glossary-plain selectedDictionary='${escapeDictName(dictionary.name)}'}}
+{{/inline}}
+
+{{#*inline "single-glossary-${getKebabCase(dictionary.name)}-plain-no-dictionary"}}
+    {{~> glossary-plain-no-dictionary selectedDictionary='${escapeDictName(dictionary.name)}' noDictionaryTag=true}}
+{{/inline}}
 `;
+        }
+        const totalMeta = currentDictionaryInfo?.counts?.termMeta;
+        if (totalMeta && totalMeta.freq && totalMeta.freq > 0) {
+            dynamicTemplates += `
+{{#*inline "single-frequency-number-${getKebabCase(dictionary.name)}"}}
+    {{~> single-frequency-number selectedDictionary='${escapeDictName(dictionary.name)}'}}
+{{/inline}}
+{{#*inline "single-frequency-${getKebabCase(dictionary.name)}"}}
+    {{~> frequencies selectedDictionary='${escapeDictName(dictionary.name)}'}}
+{{/inline}}
+`;
+        }
     }
     return dynamicTemplates;
 }
 
 /**
  * @param {import('settings').DictionariesOptions} dictionaries
+ * @param {import('dictionary-importer').Summary[]} dictionaryInfo
  * @returns {string[]} The list of field markers.
  */
-export function getDynamicFieldMarkers(dictionaries) {
+export function getDynamicFieldMarkers(dictionaries, dictionaryInfo) {
     const markers = [];
     for (const dictionary of dictionaries) {
+        const currentDictionaryInfo = dictionaryInfo.find(({title}) => title === dictionary.name);
         if (!dictionary.enabled) { continue; }
-        markers.push(`single-glossary-${getKebabCase(dictionary.name)}`);
+        const totalTerms = currentDictionaryInfo?.counts?.terms?.total;
+        if (totalTerms && totalTerms > 0) {
+            markers.push(`single-glossary-${getKebabCase(dictionary.name)}`);
+        }
+        const totalMeta = currentDictionaryInfo?.counts?.termMeta;
+        if (totalMeta && totalMeta.freq && totalMeta.freq > 0) {
+            markers.push(`single-frequency-number-${getKebabCase(dictionary.name)}`);
+        }
     }
     return markers;
 }
@@ -142,7 +186,7 @@ export function getDynamicFieldMarkers(dictionaries) {
  * @param {string} str
  * @returns {string}
  */
-function getKebabCase(str) {
+export function getKebabCase(str) {
     return str
         .replace(/[\s_\u3000]/g, '-')
         .replace(/[^\p{L}\p{N}-]/gu, '')

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ export type TypeofResult = 'string' | 'number' | 'bigint' | 'boolean' | 'symbol'
 export type SafeAny = any;
 
 /** This type is used as an explicit way of permitting the `Function` type. */
-// eslint-disable-next-line @typescript-eslint/ban-types
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 export type SafeFunction = Function;
 
 /** This type is used as an explicit way of permitting the `any` type. */

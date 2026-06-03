@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2020-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,6 +15,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
+import {getFrequencyHarmonic} from '../data/anki-note-data-creator.js';
+
 
 /**
  * @param {import('dictionary').TermDictionaryEntry} dictionaryEntry
@@ -51,9 +54,10 @@ export function groupTermTags(dictionaryEntry) {
 
 /**
  * @param {import('dictionary').TermDictionaryEntry} dictionaryEntry
+ * @param {import('dictionary-importer').Summary[]} dictionaryInfo
  * @returns {import('dictionary-data-util').DictionaryFrequency<import('dictionary-data-util').TermFrequency>[]}
  */
-export function groupTermFrequencies(dictionaryEntry) {
+export function groupTermFrequencies(dictionaryEntry, dictionaryInfo) {
     const {headwords, frequencies: sourceFrequencies} = dictionaryEntry;
 
     /** @type {import('dictionary-data-util').TermFrequenciesMap1} */
@@ -82,26 +86,53 @@ export function groupTermFrequencies(dictionaryEntry) {
     }
 
     const results = [];
+
     for (const [dictionary, map2] of map1.entries()) {
+        /** @type {import('dictionary-data-util').TermFrequency[]} */
         const frequencies = [];
         const dictionaryAlias = aliasMap.get(dictionary) ?? dictionary;
         for (const {term, reading, values} of map2.values()) {
-            frequencies.push({
+            const termFrequency = {
                 term,
                 reading,
                 values: [...values.values()],
-            });
+            };
+            frequencies.push(termFrequency);
         }
-        results.push({dictionary, frequencies, dictionaryAlias});
+        const currentDictionaryInfo = dictionaryInfo.find(({title}) => title === dictionary);
+        const freqCount = currentDictionaryInfo?.counts?.termMeta.freq ?? 0;
+        results.push({dictionary, frequencies, dictionaryAlias, freqCount});
     }
+
+    const averageFrequencies = [];
+    for (let i = 0; i < dictionaryEntry.headwords.length; i++) {
+        const averageFrequency = getFrequencyHarmonic(dictionaryEntry, i, null);
+        averageFrequencies.push({
+            term: dictionaryEntry.headwords[i].term,
+            reading: dictionaryEntry.headwords[i].reading,
+            values: [{
+                frequency: averageFrequency,
+                displayValue: averageFrequency.toString(),
+            }],
+        });
+    }
+
+    results.push({
+        dictionary: 'Average',
+        frequencies: averageFrequencies,
+        dictionaryAlias: 'Average',
+        freqCount: averageFrequencies.length,
+    });
+
     return results;
 }
 
 /**
  * @param {import('dictionary').KanjiFrequency[]} sourceFrequencies
+ * @param {import('dictionary-importer').Summary[]} dictionaryInfo
  * @returns {import('dictionary-data-util').DictionaryFrequency<import('dictionary-data-util').KanjiFrequency>[]}
  */
-export function groupKanjiFrequencies(sourceFrequencies) {
+export function groupKanjiFrequencies(sourceFrequencies, dictionaryInfo) {
     /** @type {import('dictionary-data-util').KanjiFrequenciesMap1} */
     const map1 = new Map();
     /** @type {Map<string, string>} */
@@ -133,7 +164,9 @@ export function groupKanjiFrequencies(sourceFrequencies) {
                 values: [...values.values()],
             });
         }
-        results.push({dictionary, frequencies, dictionaryAlias});
+        const currentDictionaryInfo = dictionaryInfo.find(({title}) => title === dictionary);
+        const freqCount = currentDictionaryInfo?.counts?.kanjiMeta.freq ?? 0;
+        results.push({dictionary, frequencies, dictionaryAlias, freqCount});
     }
     return results;
 }
@@ -300,7 +333,7 @@ export function isNonNounVerbOrAdjective(wordClasses) {
             case 'vs':
                 isVerbOrAdjective = true;
                 isSuruVerb = true;
-                // Falls through
+                break;
             case 'n':
                 isNoun = true;
                 break;
@@ -370,7 +403,7 @@ function arePronunciationsEquivalent({pronunciation: pronunciation1}, pronunciat
             // This cast is valid based on the type check at the start of the function.
             const pitchAccent2 = /** @type {import('dictionary').PitchAccent} */ (pronunciation2);
             return (
-                pronunciation1.position === pitchAccent2.position &&
+                pronunciation1.positions === pitchAccent2.positions &&
                 areArraysEqual(pronunciation1.nasalPositions, pitchAccent2.nasalPositions) &&
                 areArraysEqual(pronunciation1.devoicePositions, pitchAccent2.devoicePositions)
             );

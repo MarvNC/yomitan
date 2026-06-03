@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -50,7 +50,8 @@ export type MediaSimpleType = (
 export type TextFuriganaSegment = {
     text: string;
     readingMode: TextFuriganaReadingMode;
-    details: MediaObject;
+    detailsHtml: MediaObject;
+    detailsPlain: MediaObject;
 };
 
 export type TextFuriganaReadingMode = 'hiragana' | 'katakana' | null;
@@ -68,9 +69,6 @@ export type NoteData = {
     compactTags: boolean;
     group: boolean;
     merge: boolean;
-    modeTermKanji: boolean;
-    modeTermKana: boolean;
-    modeKanji: boolean;
     compactGlossaries: boolean;
     readonly uniqueExpressions: string[];
     readonly uniqueReadings: string[];
@@ -90,7 +88,7 @@ export type PitchGroup = {
 export type Pitch = {
     expressions: string[];
     reading: string;
-    position: number;
+    positions: number | string;
     nasalPositions: number[];
     devoicePositions: number[];
     tags: PitchTag[];
@@ -137,7 +135,11 @@ export type KanjiDictionaryEntry = {
     readonly stats: KanjiStatGroups;
     readonly frequencies: KanjiFrequency[];
     readonly frequencyHarmonic: number;
+    readonly frequencyHarmonicRank: number;
+    readonly frequencyHarmonicOccurrence: number;
     readonly frequencyAverage: number;
+    readonly frequencyAverageRank: number;
+    readonly frequencyAverageOccurrence: number;
     url: string;
     readonly cloze: Cloze;
 };
@@ -162,7 +164,6 @@ export type KanjiFrequency = {
     dictionaryAlias: string;
     dictionaryOrder: {
         index: number;
-        priority: number;
     };
     character: string;
     frequency: number | string;
@@ -184,21 +185,26 @@ export type TermDictionaryEntry = {
     readonly dictionaryAlias: string;
     dictionaryOrder: {
         index: number;
-        priority: number;
     };
     readonly dictionaryNames: string[];
     readonly expression: string | string[];
     readonly reading: string | string[];
     readonly expressions: TermHeadword[];
     readonly glossary?: DictionaryData.TermGlossary[];
+    readonly glossaryPlain?: string[];
     readonly glossaryScopedStyles?: string;
     readonly dictScopedStyles?: string;
     readonly definitionTags?: Tag[];
     readonly termTags?: Tag[];
     readonly definitions?: TermDefinition[];
     readonly frequencies: TermFrequency[];
+    readonly frequencyNumbers: FrequencyNumber[];
     readonly frequencyHarmonic: number;
+    readonly frequencyHarmonicRank: number;
+    readonly frequencyHarmonicOccurrence: number;
     readonly frequencyAverage: number;
+    readonly frequencyAverageRank: number;
+    readonly frequencyAverageOccurrence: number;
     readonly pitches: TermPitchAccent[];
     readonly phoneticTranscriptions: TermPhoneticTranscription[];
     sourceTermExactMatchCount: number;
@@ -246,12 +252,16 @@ export type TermFrequency = {
     dictionaryAlias: string;
     dictionaryOrder: {
         index: number;
-        priority: number;
     };
     expression: string;
     reading: string;
     hasReading: boolean;
     frequency: number | string;
+};
+
+export type FrequencyNumber = {
+    dictionary: string;
+    frequency: number;
 };
 
 export type TermPitchAccent = {
@@ -261,7 +271,6 @@ export type TermPitchAccent = {
     dictionaryAlias: string;
     dictionaryOrder: {
         index: number;
-        priority: number;
     };
     expression: string;
     reading: string;
@@ -269,7 +278,7 @@ export type TermPitchAccent = {
 };
 
 export type PitchAccent = {
-    position: number;
+    positions: number | string;
     tags: Tag[];
 };
 
@@ -280,7 +289,6 @@ export type TermPhoneticTranscription = {
     dictionaryAlias: string;
     dictionaryOrder: {
         index: number;
-        priority: number;
     };
     expression: string;
     reading: string;

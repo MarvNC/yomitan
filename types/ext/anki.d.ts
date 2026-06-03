@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,11 +57,19 @@ export type NoteInfo = {
     fields: {[key: string]: NoteFieldInfo};
     modelName: string;
     cards: CardId[];
+    cardsInfo: CardInfo[];
 };
 
 export type NoteFieldInfo = {
     value: string;
     order: number;
+};
+
+export type CardInfo = {
+    noteId: NoteId;
+    cardId: CardId;
+    flags: number;
+    cardState: number;
 };
 
 export type ApiReflectResult = {
@@ -74,4 +82,9 @@ export type MessageBody = {
     params: Core.SerializableObject;
     version: number;
     key?: string;
+};
+
+export type CanAddNotesDetail = {
+    canAdd: boolean;
+    error: string | null;
 };

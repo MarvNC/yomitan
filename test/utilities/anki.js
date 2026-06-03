@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,13 +22,13 @@ import {AnkiTemplateRenderer} from '../../ext/js/templates/anki-template-rendere
 
 /**
  * @param {import('dictionary').DictionaryEntryType} type
- * @returns {import('anki-note-builder').Field[]}
+ * @returns {import('settings').AnkiFields}
  */
 function createTestFields(type) {
-    /** @type {import('anki-note-builder').Field[]} */
-    const fields = [];
+    /** @type {import('settings').AnkiFields} */
+    const fields = {};
     for (const marker of getStandardFieldMarkers(type)) {
-        fields.push([marker, `{${marker}}`]);
+        fields[marker] = {value: `{${marker}}`, overwriteMode: 'coalesce'};
     }
     return fields;
 }
@@ -51,7 +51,14 @@ export function createTestAnkiNoteData(dictionaryEntry, mode, styles = '') {
     const data = {
         dictionaryEntry,
         resultOutputMode: mode,
-        mode: 'test',
+        cardFormat: {
+            type: 'term',
+            name: 'test',
+            deck: 'deck',
+            model: 'model',
+            fields: {},
+            icon: 'big-circle',
+        },
         glossaryLayoutMode: 'default',
         compactTags: false,
         context: {
@@ -76,7 +83,7 @@ export function createTestAnkiNoteData(dictionaryEntry, mode, styles = '') {
  * @returns {Promise<import('anki').NoteFields[]>}
  */
 export async function getTemplateRenderResults(dictionaryEntries, mode, template, expect, styles = '') {
-    const ankiTemplateRenderer = new AnkiTemplateRenderer();
+    const ankiTemplateRenderer = new AnkiTemplateRenderer(document, window);
     await ankiTemplateRenderer.prepare();
     const clozePrefix = 'cloze-prefix';
     const clozeSuffix = 'cloze-suffix';
@@ -113,12 +120,16 @@ export async function getTemplateRenderResults(dictionaryEntries, mode, template
         /** @type {import('anki-note-builder').CreateNoteDetails} */
         const details = {
             dictionaryEntry,
-            mode: 'test',
+            cardFormat: {
+                type: dictionaryEntry.type,
+                name: 'test',
+                deck: 'deckName',
+                model: 'modelName',
+                fields: createTestFields(dictionaryEntry.type),
+                icon: 'big-circle',
+            },
             context,
             template,
-            deckName: 'deckName',
-            modelName: 'modelName',
-            fields: createTestFields(dictionaryEntry.type),
             tags: ['yomitan'],
             duplicateScope: 'collection',
             duplicateScopeCheckAllModels: false,

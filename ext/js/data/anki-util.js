@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2021-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -17,6 +17,7 @@
  */
 
 import {isObjectNotArray} from '../core/object-utilities.js';
+import {unsafeArrayBufferDigest} from '../core/utilities.js';
 
 /** @type {RegExp} @readonly */
 const markerPattern = /\{([\p{Letter}\p{Number}_-]+)\}/gu;
@@ -77,10 +78,74 @@ export function isNoteDataValid(note) {
     if (!isObjectNotArray(note)) { return false; }
     const {fields, deckName, modelName} = note;
     return (
-        typeof deckName === 'string' &&
-        typeof modelName === 'string' &&
+        typeof deckName === 'string' && deckName.length > 0 &&
+        typeof modelName === 'string' && modelName.length > 0 &&
         Object.entries(fields).length > 0
     );
 }
 
 export const INVALID_NOTE_ID = -1;
+
+
+/**
+ * @param {string} prefix
+ * @param {string} extension
+ * @param {number|string} suffix
+ * @returns {string}
+ */
+export function generateAnkiNoteMediaFileName(prefix, extension, suffix) {
+    let fileName = prefix;
+
+    fileName += typeof suffix === 'string' ? suffix : `_${ankNoteDateToString(new Date(suffix))}`;
+    fileName += extension;
+
+    fileName = replaceInvalidFileNameCharacters(fileName);
+
+    return fileName;
+}
+
+/**
+ * @param {string} prefix
+ * @param {string} content
+ * @param {string?} extension
+ * @param {number?} mediaCount
+ * @param {number} timestamp
+ * @returns {Promise<string>}
+ */
+export async function mediaFileNameHashOrTimestamp(prefix, content, extension, mediaCount, timestamp) {
+    try {
+        /** @type {string} */
+        // @ts-expect-error - typescript-eslint does not recognize `Uint8Array.fromBase64` yet despite it already being available on all major browsers for over 6 months
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        const contentHash = await unsafeArrayBufferDigest('SHA-1', Uint8Array.fromBase64(content));
+        return generateAnkiNoteMediaFileName(`${prefix}_`, extension !== null ? extension : '', contentHash);
+    } catch {
+        const mediaCountInfix = mediaCount ? mediaCount + 1 : '';
+        // fallback on using timestamp for older browser versions
+        return generateAnkiNoteMediaFileName(`${prefix}_${mediaCountInfix}`, extension !== null ? extension : '', timestamp);
+    }
+}
+
+/**
+ * @param {string} fileName
+ * @returns {string}
+ */
+function replaceInvalidFileNameCharacters(fileName) {
+    // eslint-disable-next-line no-control-regex
+    return fileName.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-');
+}
+
+/**
+ * @param {Date} date
+ * @returns {string}
+ */
+function ankNoteDateToString(date) {
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth().toString().padStart(2, '0');
+    const day = date.getUTCDate().toString().padStart(2, '0');
+    const hours = date.getUTCHours().toString().padStart(2, '0');
+    const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+    const seconds = date.getUTCSeconds().toString().padStart(2, '0');
+    const milliseconds = date.getUTCMilliseconds().toString().padStart(3, '0');
+    return `${year}-${month}-${day}-${hours}-${minutes}-${seconds}-${milliseconds}`;
+}

@@ -10,89 +10,48 @@ on:
   merge_group:
 
 jobs:
-  static-analysis:
-    name: Static Analysis
+  tests:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: JavaScript
+            test: test:js
+          - name: TypeScript (main)
+            test: test:ts:main
+          - name: TypeScript (dev)
+            test: test:ts:dev
+          - name: TypeScript (test)
+            test: test:ts:test
+          - name: TypeScript (bench)
+            test: test:ts:bench
+          - name: CSS
+            test: test:css
+          - name: HTML
+            test: test:html
+          - name: Markdown
+            test: test:md
+          - name: JSON
+            test: test:json
+          - name: Unit Tests
+            test: test:unit
+          - name: Unit Tests (options)
+            test: test:unit:options
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
 
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: "package.json"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build third-party libraries
-        run: npm run build:libs
-
-      - name: Run static analysis tests
-        run: npm run test:static-analysis
-
-  static-analysis-json:
-    name: Static Analysis (JSON)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: "package.json"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build third-party libraries
-        run: npm run build:libs
-
-      - name: Run static analysis tests
-        run: npm run test:json
-
-  unit-tests:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: "package.json"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build third-party libraries
-        run: npm run build:libs
-
-      - name: Run unit tests
-        run: npm run test:unit
-
-      - name: Run unit tests (options)
-        run: npm run test:unit:options
+      - name: Run ${{ matrix.name }} tests
+        run: npm run ${{ matrix.test }}
 
   test-build:
     name: Test Build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: "package.json"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Libs
-        run: npm run build:libs
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
 
       - name: Build Legal
         run: npm run license-report:html
@@ -104,5 +63,20 @@ jobs:
         uses: cardinalby/schema-validator-action@2166123eb256fa40baef7e22ab1379708425efc7 # v3.1.1
         with:
           file: ext/manifest.json
-          schema: "https://json.schemastore.org/chrome-manifest.json"
+          schema: ./dev/data/chrome-manifest-schema.json
           fixSchemas: true
+
+  bench:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name != 'merge_group'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+
+      - name: Run Benchmarks
+        uses: CodSpeedHQ/action@c381be0bfd20e844fb45594f6aa182ffcd94545c # v4.15.0
+        with:
+          mode: "simulation"
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          run: npm run bench

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2021-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -82,6 +82,10 @@ export type KanjiDictionaryEntry = {
      * The name of the dictionary that the information originated from.
      */
     dictionary: string;
+    /**
+     * The index of the dictionary in the original list of dictionaries used for the lookup.
+     */
+    dictionaryIndex: number;
     /**
      * The alias of the dictionary
      */
@@ -179,10 +183,6 @@ export type KanjiFrequency = {
      */
     dictionaryAlias: string;
     /**
-     * The priority of the dictionary.
-     */
-    dictionaryPriority: number;
-    /**
      * The kanji character for the frequency.
      */
     character: string;
@@ -198,6 +198,10 @@ export type KanjiFrequency = {
      * Whether or not the displayValue string was parsed to determine the frequency value.
      */
     displayValueParsed: boolean;
+    /**
+     * How the frequency should be interpreted.
+     */
+    frequencyMode: DictionaryData.FrequencyMode | null;
 };
 
 // Terms
@@ -240,13 +244,13 @@ export type TermDictionaryEntry = {
      */
     dictionaryAlias: string;
     /**
-     * The priority of the dictionary.
-     */
-    dictionaryPriority: number;
-    /**
      * The number of primary sources that had an exact text match for the term.
      */
     sourceTermExactMatchCount: number;
+    /**
+     * Whether the term reading matched the primary reading.
+     */
+    matchPrimaryReading: boolean;
     /**
      * The maximum length of the original text for all primary sources.
      */
@@ -294,6 +298,10 @@ export type TermHeadword = {
      */
     index: number;
     /**
+     * The current index of this headword in the parent {@link TermDictionaryEntry.headwords} array.
+     */
+    headwordIndex: number;
+    /**
      * The text for the term.
      */
     term: string;
@@ -324,7 +332,7 @@ export type TermDefinition = {
      */
     index: number;
     /**
-     * A list of headwords that this definition corresponds to.
+     * A list of {@link TermHeadword.headwordIndex} values which this definition corresponds to.
      */
     headwordIndices: number[];
     /**
@@ -339,10 +347,6 @@ export type TermDefinition = {
      * The alias of the dictionary
      */
     dictionaryAlias: string;
-    /**
-     * The priority of the dictionary.
-     */
-    dictionaryPriority: number;
     /**
      * Database ID for the definition.
      */
@@ -385,11 +389,11 @@ export type TermPronunciation = {
      */
     index: number;
     /**
-     * Which headword this pronunciation corresponds to.
+     * Which {@link TermHeadword.headwordIndex} this pronunciation corresponds to.
      */
     headwordIndex: number;
     /**
-     * The name of the dictionary that the proununciation information originated from.
+     * The name of the dictionary that the pronunciation information originated from.
      */
     dictionary: string;
     /**
@@ -400,10 +404,6 @@ export type TermPronunciation = {
      * The alias of the dictionary
      */
     dictionaryAlias: string;
-    /**
-     * The priority of the dictionary.
-     */
-    dictionaryPriority: number;
     /**
      * The pronunciations for the term.
      */
@@ -423,7 +423,7 @@ export type PitchAccent = {
     /**
      * Position of the downstep, as a number of mora.
      */
-    position: number;
+    positions: number | string;
     /**
      * Positions of morae with a nasal sound.
      */
@@ -467,7 +467,7 @@ export type TermFrequency = {
      */
     index: number;
     /**
-     * Which headword this frequency corresponds to.
+     * Which {@link TermHeadword.headwordIndex} this frequency corresponds to.
      */
     headwordIndex: number;
     /**
@@ -483,13 +483,13 @@ export type TermFrequency = {
      */
     dictionaryAlias: string;
     /**
-     * The priority of the dictionary.
-     */
-    dictionaryPriority: number;
-    /**
      * Whether or not the frequency had an explicit reading specified.
      */
     hasReading: boolean;
+    /**
+     * How the frequency number should be interpreted for this dictionary.
+     */
+    frequencyMode: DictionaryData.FrequencyMode | null;
     /**
      * The frequency for the term, as a number of occurrences or an overall rank.
      */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -63,6 +63,7 @@ export type Options = {
 
 export type GlobalOptions = {
     database: GlobalDatabaseOptions;
+    dataTransmissionConsentShown: boolean;
 };
 
 export type GlobalDatabaseOptions = {
@@ -70,6 +71,7 @@ export type GlobalDatabaseOptions = {
 };
 
 export type Profile = {
+    id: string;
     name: string;
     conditionGroups: ProfileConditionGroup[];
     options: ProfileOptions;
@@ -113,6 +115,7 @@ export type GeneralOptions = {
     fontSize: number;
     lineHeight: string;
     popupDisplayMode: PopupDisplayMode;
+    popupFullWidthPosition: PopupFullWidthPosition;
     popupWidth: number;
     popupHeight: number;
     popupHorizontalOffset: number;
@@ -127,6 +130,7 @@ export type GeneralOptions = {
     showGuide: boolean;
     enableContextMenuScanSelected: boolean;
     compactTags: boolean;
+    averageFrequency: boolean;
     glossaryLayoutMode: GlossaryLayoutMode;
     mainDictionary: string;
     popupTheme: PopupTheme;
@@ -149,6 +153,8 @@ export type GeneralOptions = {
     sortFrequencyDictionary: string | null;
     sortFrequencyDictionaryOrder: SortFrequencyDictionaryOrder;
     stickySearchHeader: boolean;
+    enableYomitanApi: boolean;
+    yomitanApiAllowCssSanitizationBypass: boolean;
 };
 
 export type PopupWindowOptions = {
@@ -166,8 +172,12 @@ export type AudioOptions = {
     enabled: boolean;
     volume: number;
     autoPlay: boolean;
+    fallbackSoundType: FallbackSoundType;
     sources: AudioSourceOptions[];
+    enableDefaultAudioSources: boolean;
 };
+
+export type FallbackSoundType = 'none' | 'click' | 'bloop';
 
 export type AudioSourceOptions = {
     type: AudioSourceType;
@@ -177,9 +187,8 @@ export type AudioSourceOptions = {
 
 export type ScanningOptions = {
     inputs: ScanningInput[];
-    preventMiddleMouse: ScanningPreventMiddleMouseOptions;
-    touchInputEnabled: boolean;
-    pointerEventsEnabled: boolean;
+    preventMiddleMouse: ScanningPreventSecondaryMouseOptions;
+    preventBackForward: ScanningPreventSecondaryMouseOptions;
     selectText: boolean;
     alphanumeric: boolean;
     autoHideResults: boolean;
@@ -196,6 +205,9 @@ export type ScanningOptions = {
     matchTypePrefix: boolean;
     hidePopupOnCursorExit: boolean;
     hidePopupOnCursorExitDelay: number;
+    reducedMotionScrolling: boolean;
+    reducedMotionScrollingScale: number;
+    reducedMotionScrollingSwipeThreshold: number;
     normalizeCssZoom: boolean;
     scanWithoutMousemove: boolean;
     scanResolution: string;
@@ -229,9 +241,11 @@ export type ScanningInputOptions = {
     scanOnPenRelease: boolean;
     preventTouchScrolling: boolean;
     preventPenScrolling: boolean;
+    minimumTouchTime: number;
 };
 
-export type ScanningPreventMiddleMouseOptions = {
+export type ScanningPreventSecondaryMouseOptions = {
+    onTextHover: boolean;
     onWebPages: boolean;
     onPopupPages: boolean;
     onSearchPages: boolean;
@@ -267,7 +281,6 @@ export type DictionariesOptions = DictionaryOptions[];
 export type DictionaryOptions = {
     name: string;
     alias: string;
-    priority: number;
     enabled: boolean;
     allowSecondarySearches: boolean;
     definitionsCollapsible: DictionaryDefinitionsCollapsible;
@@ -282,6 +295,7 @@ export type ParsingOptions = {
     selectedParser: string | null;
     termSpacing: boolean;
     readingMode: ParsingReadingMode;
+    useAllFrequencyDictionaries: boolean;
 };
 
 export type AnkiOptions = {
@@ -289,18 +303,20 @@ export type AnkiOptions = {
     server: string;
     tags: string[];
     screenshot: AnkiScreenshotOptions;
-    terms: AnkiNoteOptions;
-    kanji: AnkiNoteOptions;
+    cardFormats: AnkiCardFormat[];
     duplicateScope: AnkiDuplicateScope;
     duplicateScopeCheckAllModels: boolean;
     duplicateBehavior: AnkiDuplicateBehavior;
     checkForDuplicates: boolean;
     fieldTemplates: string | null;
     suspendNewCards: boolean;
-    displayTags: AnkiDisplayTags;
+    displayTagsAndFlags: AnkiDisplayTagsAndFlags;
+    targetTags: string[];
     noteGuiMode: AnkiNoteGuiMode;
     apiKey: string;
     downloadTimeout: number;
+    forceSync: boolean;
+    noteDupeCheckFirst: boolean;
 };
 
 export type AnkiScreenshotOptions = {
@@ -308,15 +324,29 @@ export type AnkiScreenshotOptions = {
     quality: number;
 };
 
-export type AnkiNoteOptions = {
+export type AnkiCardFormat = {
+    type: AnkiCardFormatType;
+    name: string;
     deck: string;
     model: string;
-    fields: AnkiNoteFields;
+    fields: AnkiFields;
+    icon: AddNoteIcon;
 };
 
-export type AnkiNoteFields = {
-    [key: string]: string;
+export type AnkiCardFormatType = 'kanji' | 'term';
+
+export type AddNoteIcon = 'big-circle' | 'small-circle' | 'big-square' | 'big-diamond';
+
+export type AnkiFields = {
+    [key: string]: AnkiField;
 };
+
+export type AnkiField = {
+    value: string;
+    overwriteMode: AnkiNoteFieldOverwriteMode;
+};
+
+export type AnkiNoteFieldOverwriteMode = 'coalesce' | 'coalesce-new' | 'overwrite' | 'append' | 'prepend' | 'skip';
 
 export type SentenceParsingOptions = {
     scanExtent: number;
@@ -356,22 +386,25 @@ export type AccessibilityOptions = {
     forceGoogleDocsHtmlRendering: boolean;
 };
 
-export type PreventMiddleMouseOptions = {
+export type PreventSecondaryMouseOptions = {
+    onTextHover: boolean;
     onWebPages: boolean;
     onPopupPages: boolean;
     onSearchPages: boolean;
     onSearchQuery: boolean;
 };
 
-export type ResultOutputMode = 'group' | 'merge' | 'split';
+export type ResultOutputMode = 'group' | 'merge' | 'split' | 'term';
 
 export type PopupDisplayMode = 'default' | 'full-width';
+
+export type PopupFullWidthPosition = 'top' | 'above-cursor' | 'bottom';
 
 export type PopupHorizontalTextPosition = 'below' | 'above';
 
 export type PopupVerticalTextPosition = 'default' | 'before' | 'after' | 'left' | 'right';
 
-export type GlossaryLayoutMode = 'default' | 'compact';
+export type GlossaryLayoutMode = 'default' | 'compact' | 'compact-popup-anki';
 
 export type PopupTheme = 'light' | 'dark' | 'browser' | 'site';
 
@@ -383,7 +416,7 @@ export type PopupActionBarVisibility = 'auto' | 'always';
 
 export type PopupActionBarLocation = 'left' | 'right' | 'top' | 'bottom';
 
-export type FrequencyDisplayMode = 'tags' | 'tags-grouped' | 'split-tags' | 'split-tags-grouped' | 'inline-list' | 'list';
+export type FrequencyDisplayMode = 'tags' | 'tags-grouped' | 'split-tags' | 'split-tags-grouped' | 'inline-list' | 'list' | 'list-bordered';
 
 export type TermDisplayMode = 'ruby' | 'ruby-and-reading' | 'term-and-reading' | 'term-only';
 
@@ -409,7 +442,7 @@ export type AnkiDuplicateScope = 'collection' | 'deck' | 'deck-root';
 
 export type AnkiDuplicateBehavior = 'prevent' | 'overwrite' | 'new';
 
-export type AnkiDisplayTags = 'never' | 'always' | 'non-standard';
+export type AnkiDisplayTagsAndFlags = 'never' | 'always' | 'non-standard' | 'custom';
 
 export type AnkiNoteGuiMode = 'browse' | 'edit';
 

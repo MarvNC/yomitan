@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,10 +19,12 @@ import type {TextSourceGenerator} from '../../ext/js/dom/text-source-generator';
 import type {API} from '../../ext/js/comm/api';
 import type * as Dictionary from './dictionary';
 import type * as Display from './display';
+import type * as Environment from './environment';
 import type * as Input from './input';
 import type * as Settings from './settings';
 import type * as TextSource from './text-source';
 import type {EventNames, EventArgument as BaseEventArgument} from './core';
+import {PageType} from 'frontend';
 
 export type SearchResultDetail = {
     documentTitle: string;
@@ -34,15 +36,17 @@ export type Options = {
     normalizeCssZoom?: boolean;
     selectText?: boolean;
     delay?: number;
-    touchInputEnabled?: boolean;
-    pointerEventsEnabled?: boolean;
     scanLength?: number;
     layoutAwareScan?: boolean;
-    preventMiddleMouse?: boolean;
+    preventMiddleMouseOnPage?: boolean;
+    preventMiddleMouseOnTextHover?: boolean;
+    preventBackForwardOnPage?: boolean;
+    preventBackForwardOnTextHover?: boolean;
     matchTypePrefix?: boolean;
     sentenceParsingOptions?: SentenceParsingOptions;
     scanWithoutMousemove?: boolean;
     scanResolution?: string;
+    pageType?: PageType;
 };
 
 export type InputOptionsOuter = {
@@ -70,6 +74,7 @@ export type InputOptions = {
     scanOnPenRelease: boolean;
     preventTouchScrolling: boolean;
     preventPenScrolling: boolean;
+    minimumTouchTime: number;
 };
 
 export type SentenceParsingOptions = {
@@ -95,6 +100,7 @@ export type InputConfig = {
     scanOnPenRelease: boolean;
     preventTouchScrolling: boolean;
     preventPenScrolling: boolean;
+    minimumTouchTime: number;
 };
 
 export type InputInfo = {
@@ -104,7 +110,7 @@ export type InputInfo = {
     passive: boolean;
     modifiers: Input.Modifier[];
     modifierKeys: Input.ModifierKey[];
-    detail: InputInfoDetail | undefined;
+    detail: InputInfoDetail | undefined | null;
 };
 
 export type InputInfoDetail = {
@@ -154,7 +160,10 @@ export type ConstructorDetails = {
     ignorePoint?: ((x: number, y: number) => Promise<boolean>) | null;
     searchTerms?: boolean;
     searchKanji?: boolean;
+    searchOnClick?: boolean;
+    searchOnClickOnly?: boolean;
     textSourceGenerator: TextSourceGenerator;
+    browser: Environment.Browser | null;
 };
 
 export type SearchContext = {

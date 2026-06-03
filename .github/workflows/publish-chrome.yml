@@ -18,7 +18,6 @@ jobs:
     environment: cd
     outputs:
       result: ${{ steps.webStorePublish.outcome }}
-      releaseUploadUrl: ${{ steps.getZipAsset.outputs.releaseUploadUrl }}
     permissions:
       actions: write
     steps:
@@ -38,7 +37,7 @@ jobs:
               return attempt < max ? attempt + 1 : '';
             }
 
-      - uses: robinraju/release-downloader@a96f54c1b5f5e09e47d9504526e96febd949d4c2 # pin@v1.11
+      - uses: robinraju/release-downloader@28fc21f50d76778e7023361aa1f863e717d3d56f # pin@v1.13
         with:
           tag: ${{ github.ref_name }}
           fileName: "*"

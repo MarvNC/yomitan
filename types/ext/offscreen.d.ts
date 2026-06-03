@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -95,6 +95,16 @@ type ApiSurface = {
         params: void;
         return: string | null;
     };
+    createAndRegisterPortOffscreen: {
+        params: void;
+        return: void;
+    };
+    sanitizeCSSOffscreen: {
+        params: {
+            css: string;
+        };
+        return: string;
+    };
 };
 
 export type ApiMessage<TName extends ApiNames> = (
@@ -136,3 +146,38 @@ export type ApiParams<TName extends ApiNames> = BaseApiParams<ApiSurface[TName]>
 export type ApiReturn<TName extends ApiNames> = BaseApiReturn<ApiSurface[TName]>;
 
 export type ApiMessageAny = {[name in ApiNames]: ApiMessage<name>}[ApiNames];
+
+// MessageChannel API
+
+type McApiSurface = {
+    connectToDatabaseWorker: {
+        params: void;
+        return: void;
+    };
+    dummy: {
+        params: void;
+        return: void;
+    };
+};
+
+type McApiExtraArgs = [ports: readonly MessagePort[]];
+
+export type McApiMessage<TName extends McApiNames> = (
+    McApiParams<TName> extends void ?
+        {action: TName, params?: never} :
+        {action: TName, params: McApiParams<TName>}
+);
+
+export type McApiNames = BaseApiNames<McApiSurface>;
+
+export type McApiMap = BaseApiMap<McApiSurface, McApiExtraArgs>;
+
+export type McApiMapInit = BaseApiMapInit<McApiSurface, McApiExtraArgs>;
+
+export type McApiHandler<TName extends McApiNames> = BaseApiHandler<McApiSurface[TName], McApiExtraArgs>;
+
+export type McApiParams<TName extends McApiNames> = BaseApiParams<McApiSurface[TName]>;
+
+export type McApiReturn<TName extends McApiNames> = BaseApiReturn<McApiSurface[TName]>;
+
+export type McApiMessageAny = {[name in McApiNames]: McApiMessage<name>}[McApiNames];

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2020-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -32,7 +32,7 @@ export class GenericSettingController {
         this._defaultScope = 'profile';
         /** @type {DOMDataBinder<import('generic-setting-controller').ElementMetadata>} */
         this._dataBinder = new DOMDataBinder(
-            '[data-setting]',
+            ['[data-setting]', '[data-permissions-setting]'],
             this._createElementMetadata.bind(this),
             this._compareElementMetadata.bind(this),
             this._getValues.bind(this),
@@ -75,7 +75,8 @@ export class GenericSettingController {
      */
     _createElementMetadata(element) {
         if (!(element instanceof HTMLElement)) { return void 0; }
-        const {setting: path, scope, transform: transformRaw} = element.dataset;
+        const {scope, transform: transformRaw} = element.dataset;
+        const path = element.dataset.setting ?? element.dataset.permissionsSetting;
         if (typeof path !== 'string') { return void 0; }
         const scope2 = this._normalizeScope(scope);
         return {

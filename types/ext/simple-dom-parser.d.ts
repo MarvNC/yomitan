@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,7 +24,6 @@ export type {
 /**
  * This type is used as a generic reference to an element object from a generic DOM API.
  */
-// eslint-disable-next-line @typescript-eslint/ban-types
 export type Element = object;
 
 export type ISimpleDomParser = {

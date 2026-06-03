@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2016-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import {AccessibilityController} from '../accessibility/accessibility-controller.js';
 import {AnkiConnect} from '../comm/anki-connect.js';
 import {ClipboardMonitor} from '../comm/clipboard-monitor.js';
 import {ClipboardReader} from '../comm/clipboard-reader.js';
 import {Mecab} from '../comm/mecab.js';
+import {YomitanApi} from '../comm/yomitan-api.js';
 import {createApiMap, invokeApiMapHandler} from '../core/api-map.js';
 import {ExtensionError} from '../core/extension-error.js';
 import {fetchText} from '../core/fetch-utilities.js';
@@ -28,12 +28,13 @@ import {logErrorLevelToNumber} from '../core/log-utilities.js';
 import {log} from '../core/log.js';
 import {isObjectNotArray} from '../core/object-utilities.js';
 import {clone, deferPromise, promiseTimeout} from '../core/utilities.js';
-import {INVALID_NOTE_ID, isNoteDataValid} from '../data/anki-util.js';
+import {generateAnkiNoteMediaFileName, INVALID_NOTE_ID, isNoteDataValid, mediaFileNameHashOrTimestamp} from '../data/anki-util.js';
 import {arrayBufferToBase64} from '../data/array-buffer-util.js';
 import {OptionsUtil} from '../data/options-util.js';
 import {getAllPermissions, hasPermissions, hasRequiredPermissionsForOptions} from '../data/permissions-util.js';
 import {DictionaryDatabase} from '../dictionary/dictionary-database.js';
 import {Environment} from '../extension/environment.js';
+import {CacheMap} from '../general/cache-map.js';
 import {ObjectPropertyAccessor} from '../general/object-property-accessor.js';
 import {distributeFuriganaInflected, isCodePointJapanese, convertKatakanaToHiragana as jpConvertKatakanaToHiragana} from '../language/ja/japanese.js';
 import {getLanguageSummaries, isTextLookupWorthy} from '../language/languages.js';
@@ -72,7 +73,6 @@ export class Backend {
             this._translator = new Translator(this._dictionaryDatabase);
             /** @type {ClipboardReader|ClipboardReaderProxy} */
             this._clipboardReader = new ClipboardReader(
-                // eslint-disable-next-line no-undef
                 (typeof document === 'object' && document !== null ? document : null),
                 '#clipboard-paste-target',
                 '#clipboard-rich-content-paste-target',
@@ -181,11 +181,20 @@ export class Backend {
             ['isTabSearchPopup',             this._onApiIsTabSearchPopup.bind(this)],
             ['triggerDatabaseUpdated',       this._onApiTriggerDatabaseUpdated.bind(this)],
             ['testMecab',                    this._onApiTestMecab.bind(this)],
+            ['testYomitanApi',               this._onApiTestYomitanApi.bind(this)],
             ['isTextLookupWorthy',           this._onApiIsTextLookupWorthy.bind(this)],
             ['getTermFrequencies',           this._onApiGetTermFrequencies.bind(this)],
             ['findAnkiNotes',                this._onApiFindAnkiNotes.bind(this)],
             ['openCrossFramePort',           this._onApiOpenCrossFramePort.bind(this)],
             ['getLanguageSummaries',         this._onApiGetLanguageSummaries.bind(this)],
+            ['heartbeat',                    this._onApiHeartbeat.bind(this)],
+            ['forceSync',                    this._onApiForceSync.bind(this)],
+        ]);
+
+        /** @type {import('api').PmApiMap} */
+        this._pmApiMap = createApiMap([
+            ['connectToDatabaseWorker', this._onPmConnectToDatabaseWorker.bind(this)],
+            ['registerOffscreenPort',   this._onPmApiRegisterOffscreenPort.bind(this)],
         ]);
         /* eslint-enable @stylistic/no-multi-spaces */
 
@@ -195,8 +204,14 @@ export class Backend {
             ['openInfoPage', this._onCommandOpenInfoPage.bind(this)],
             ['openSettingsPage', this._onCommandOpenSettingsPage.bind(this)],
             ['openSearchPage', this._onCommandOpenSearchPage.bind(this)],
+            ['openSearchPageCurrentTab', this._onCommandOpenSearchPageCurrentTab.bind(this)],
             ['openPopupWindow', this._onCommandOpenPopupWindow.bind(this)],
         ]));
+
+        /** @type {YomitanApi} */
+        this._yomitanApi = new YomitanApi(this._apiMap, this._offscreen);
+        /** @type {CacheMap<string, {originalTextLength: number, textSegments: import('api').ParseTextSegment[]}>} */
+        this._textParseCache = new CacheMap(10000, 3600000); // 1 hour idle time, ~32MB per 1000 entries for Japanese
     }
 
     /**
@@ -241,6 +256,10 @@ export class Backend {
         const onMessage = this._onMessageWrapper.bind(this);
         chrome.runtime.onMessage.addListener(onMessage);
 
+        // On Chrome, this is for receiving messages sent with navigator.serviceWorker, which has the benefit of being able to transfer objects, but doesn't accept callbacks
+        (/** @type {ServiceWorkerGlobalScope & typeof globalThis} */ (globalThis)).addEventListener('message', this._onPmMessage.bind(this));
+        (/** @type {ServiceWorkerGlobalScope & typeof globalThis} */ (globalThis)).addEventListener('messageerror', this._onPmMessageError.bind(this));
+
         if (this._canObservePermissionsChanges()) {
             const onPermissionsChanged = this._onWebExtensionEventWrapper(this._onPermissionsChanged.bind(this));
             chrome.permissions.onAdded.addListener(onPermissionsChanged);
@@ -248,6 +267,20 @@ export class Backend {
         }
 
         chrome.runtime.onInstalled.addListener(this._onInstalled.bind(this));
+    }
+
+    /** @type {import('api').PmApiHandler<'connectToDatabaseWorker'>} */
+    async _onPmConnectToDatabaseWorker(_params, ports) {
+        if (ports !== null && ports.length > 0) {
+            await this._dictionaryDatabase.connectToDatabaseWorker(ports[0]);
+        }
+    }
+
+    /** @type {import('api').PmApiHandler<'registerOffscreenPort'>} */
+    async _onPmApiRegisterOffscreenPort(_params, ports) {
+        if (ports !== null && ports.length > 0) {
+            await this._offscreen?.registerOffscreenPort(ports[0]);
+        }
     }
 
     /**
@@ -274,6 +307,17 @@ export class Backend {
             }
             this._clipboardReader.browser = this._environment.getInfo().browser;
 
+            // if this is Firefox and therefore not running in Service Worker, we need to use a SharedWorker to setup a MessageChannel to postMessage with the popup
+            if (self.constructor.name === 'Window') {
+                const sharedWorkerBridge = new SharedWorker(new URL('../comm/shared-worker-bridge.js', import.meta.url), {type: 'module'});
+                sharedWorkerBridge.port.postMessage({action: 'registerBackendPort'});
+                sharedWorkerBridge.port.addEventListener('message', (/** @type {MessageEvent} */ e) => {
+                    // connectToBackend2
+                    e.ports[0].onmessage = this._onPmMessage.bind(this);
+                });
+                sharedWorkerBridge.port.addEventListener('messageerror', this._onPmMessageError.bind(this));
+                sharedWorkerBridge.port.start();
+            }
             try {
                 await this._dictionaryDatabase.prepare();
             } catch (e) {
@@ -287,6 +331,8 @@ export class Backend {
             this._options = await this._optionsUtil.load();
 
             this._applyOptions('background');
+
+            this._attachOmniboxListener();
 
             const options = this._getProfileOptions({current: true}, false);
             if (options.general.showGuide) {
@@ -410,6 +456,25 @@ export class Backend {
     }
 
     /**
+     * @param {MessageEvent<import('api').PmApiMessageAny>} event
+     * @returns {boolean}
+     */
+    _onPmMessage(event) {
+        const {action, params} = event.data;
+        return invokeApiMapHandler(this._pmApiMap, action, params, [event.ports], () => {});
+    }
+
+    /**
+     * @param {MessageEvent<import('api').PmApiMessageAny>} event
+     */
+    _onPmMessageError(event) {
+        const error = new ExtensionError('Backend: Error receiving message via postMessage');
+        error.data = event;
+        log.error(error);
+    }
+
+
+    /**
      * @param {chrome.tabs.ZoomChangeInfo} event
      */
     _onZoomChange({tabId, oldZoomFactor, newZoomFactor}) {
@@ -496,32 +561,45 @@ export class Backend {
     }
 
     /** @type {import('api').ApiHandler<'parseText'>} */
-    async _onApiParseText({text, optionsContext, scanLength, useInternalParser, useMecabParser}) {
-        const [internalResults, mecabResults] = await Promise.all([
-            (useInternalParser ? this._textParseScanning(text, scanLength, optionsContext) : null),
-            (useMecabParser ? this._textParseMecab(text) : null),
-        ]);
-
+    async _onApiParseText({text, optionsContext, scanLength, useInternalParser, useMecabParser, useAllFrequencyDictionaries}) {
         /** @type {import('api').ParseTextResultItem[]} */
         const results = [];
 
-        if (internalResults !== null) {
-            results.push({
-                id: 'scan',
-                source: 'scanning-parser',
-                dictionary: null,
-                content: internalResults,
-            });
-        }
+        const [internalResults, mecabResults] = await Promise.all([
+            useInternalParser ?
+                (Array.isArray(text) ?
+                    Promise.all(text.map((t) => this._textParseScanning(t, scanLength, optionsContext, useAllFrequencyDictionaries))) :
+                    Promise.all([this._textParseScanning(text, scanLength, optionsContext, useAllFrequencyDictionaries)])) :
+                null,
+            useMecabParser ?
+                (Array.isArray(text) ?
+                    Promise.all(text.map((t) => this._textParseMecab(t))) :
+                    Promise.all([this._textParseMecab(text)])) :
+                null,
+        ]);
 
-        if (mecabResults !== null) {
-            for (const [dictionary, content] of mecabResults) {
+        if (internalResults !== null) {
+            for (const [index, internalResult] of internalResults.entries()) {
                 results.push({
-                    id: `mecab-${dictionary}`,
-                    source: 'mecab',
-                    dictionary,
-                    content,
+                    id: 'scan',
+                    source: 'scanning-parser',
+                    dictionary: null,
+                    index,
+                    content: internalResult,
                 });
+            }
+        }
+        if (mecabResults !== null) {
+            for (const [index, mecabResult] of mecabResults.entries()) {
+                for (const [dictionary, content] of mecabResult) {
+                    results.push({
+                        id: `mecab-${dictionary}`,
+                        source: 'mecab',
+                        dictionary,
+                        index,
+                        content,
+                    });
+                }
             }
         }
 
@@ -549,43 +627,85 @@ export class Backend {
     }
 
     /**
+     * Removes all fields except the first field from an array of notes
+     * @param {import('anki').Note[]} notes
+     * @returns {import('anki').Note[]}
+     */
+    _stripNotesArray(notes) {
+        const newNotes = structuredClone(notes);
+        for (let i = 0; i < newNotes.length; i++) {
+            if (Object.keys(newNotes[i].fields).length === 0) { continue; }
+            const [firstField, firstFieldValue] = Object.entries(newNotes[i].fields)[0];
+            newNotes[i].fields = {};
+            newNotes[i].fields[firstField] = firstFieldValue;
+        }
+        return newNotes;
+    }
+
+    /**
+     * @param {import('anki').Note[]} notes
+     * @param {import('anki').Note[]} notesStrippedNoDuplicates
+     * @returns {Promise<{ note: import('anki').Note, isDuplicate: boolean }[]>}
+     */
+    async _findDuplicates(notes, notesStrippedNoDuplicates) {
+        const canAddNotesWithErrors = await this._anki.canAddNotesWithErrorDetail(notesStrippedNoDuplicates);
+        return canAddNotesWithErrors.map((item, i) => ({
+            note: notes[i],
+            isDuplicate: item.error === null ?
+                false :
+                item.error.includes('cannot create note because it is a duplicate'),
+        }));
+    }
+
+    /**
+     * @param {import('anki').Note[]} notes
+     * @param {import('anki').Note[]} notesStrippedNoDuplicates
+     * @param {import('anki').Note[]} notesStrippedDuplicates
+     * @returns {Promise<{ note: import('anki').Note, isDuplicate: boolean }[]>}
+     */
+    async _findDuplicatesFallback(notes, notesStrippedNoDuplicates, notesStrippedDuplicates) {
+        const [withDuplicatesAllowed, noDuplicatesAllowed] = await Promise.all([
+            this._anki.canAddNotes(notesStrippedDuplicates),
+            this._anki.canAddNotes(notesStrippedNoDuplicates),
+        ]);
+
+        return withDuplicatesAllowed.map((item, i) => ({
+            note: notes[i],
+            isDuplicate: item !== noDuplicatesAllowed[i],
+        }));
+    }
+
+    /**
      * @param {import('anki').Note[]} notes
      * @returns {Promise<import('backend').CanAddResults>}
      */
     async partitionAddibleNotes(notes) {
+        // strip all fields except the first from notes before dupe checking
+        // minimizes the amount of data being sent and reduce network latency and AnkiConnect latency
+        const strippedNotes = this._stripNotesArray(notes);
+
         // `allowDuplicate` is on for all notes by default, so we temporarily set it to false
         // to check which notes are duplicates.
-        const notesNoDuplicatesAllowed = notes.map((note) => ({...note, options: {...note.options, allowDuplicate: false}}));
+        const notesNoDuplicatesAllowed = strippedNotes.map((note) => ({...note, options: {...note.options, allowDuplicate: false}}));
 
-        // If only older AnkiConnect available, use `canAddNotes`.
-        const withDuplicatesAllowed = await this._anki.canAddNotes(notes);
-        const noDuplicatesAllowed = await this._anki.canAddNotes(notesNoDuplicatesAllowed);
-
-        /** @type {{ note: import('anki').Note, isDuplicate: boolean }[]} */
-        const canAddArray = [];
-
-        /** @type {import('anki').Note[]} */
-        const cannotAddArray = [];
-
-        for (let i = 0; i < withDuplicatesAllowed.length; i++) {
-            if (withDuplicatesAllowed[i] === noDuplicatesAllowed[i]) {
-                canAddArray.push({note: notes[i], isDuplicate: false});
-            } else {
-                canAddArray.push({note: notes[i], isDuplicate: true});
+        try {
+            return await this._findDuplicates(notes, notesNoDuplicatesAllowed);
+        } catch (e) {
+            // User has older anki-connect that does not support canAddNotesWithErrorDetail
+            if (e instanceof ExtensionError && e.message.includes('Anki error: unsupported action')) {
+                return await this._findDuplicatesFallback(notes, notesNoDuplicatesAllowed, strippedNotes);
             }
-        }
 
-        return {canAddArray, cannotAddArray};
+            throw e;
+        }
     }
 
     /** @type {import('api').ApiHandler<'getAnkiNoteInfo'>} */
     async _onApiGetAnkiNoteInfo({notes, fetchAdditionalInfo}) {
-        const {canAddArray, cannotAddArray} = await this.partitionAddibleNotes(notes);
+        const canAddArray = await this.partitionAddibleNotes(notes);
 
         /** @type {import('anki').NoteInfoWrapper[]} */
-        const results = cannotAddArray
-            .filter((note) => isNoteDataValid(note))
-            .map(() => ({canAdd: false, valid: false, noteIds: null}));
+        const results = [];
 
         /** @type {import('anki').Note[]} */
         const duplicateNotes = [];
@@ -601,7 +721,10 @@ export class Backend {
             }
         }
 
-        const duplicateNoteIds = await this._anki.findNoteIds(duplicateNotes);
+        const duplicateNoteIds =
+            duplicateNotes.length > 0 ?
+                await this._anki.findNoteIds(duplicateNotes) :
+                [];
 
         for (let i = 0; i < canAddArray.length; ++i) {
             const {note, isDuplicate} = canAddArray[i];
@@ -613,7 +736,7 @@ export class Backend {
             }
 
             const noteIds = isDuplicate ? duplicateNoteIds[originalIndices.indexOf(i)] : null;
-            const noteInfos = (fetchAdditionalInfo && noteIds !== null && noteIds.length > 0) ? await this._anki.notesInfo(noteIds) : [];
+            const noteInfos = (fetchAdditionalInfo && noteIds !== null && noteIds.length > 0) ? await this._notesCardsInfo(noteIds) : [];
 
             const info = {
                 canAdd: valid,
@@ -626,6 +749,27 @@ export class Backend {
         }
 
         return results;
+    }
+
+    /**
+     * @param {number[]} noteIds
+     * @returns {Promise<(?import('anki').NoteInfo)[]>}
+     */
+    async _notesCardsInfo(noteIds) {
+        const notesInfo = await this._anki.notesInfo(noteIds);
+        /** @type {number[]} */
+        // @ts-expect-error - ts is not smart enough to realize that filtering !!x removes null and undefined
+        const cardIds = notesInfo.flatMap((x) => x?.cards).filter((x) => !!x);
+        const cardsInfo = await this._anki.cardsInfo(cardIds);
+        for (let i = 0; i < notesInfo.length; i++) {
+            if (notesInfo[i] !== null) {
+                const cardInfo = cardsInfo.find((x) => x?.noteId === notesInfo[i]?.noteId);
+                if (cardInfo) {
+                    notesInfo[i]?.cardsInfo.push(cardInfo);
+                }
+            }
+        }
+        return notesInfo;
     }
 
     /** @type {import('api').ApiHandler<'injectAnkiNoteMedia'>} */
@@ -898,6 +1042,43 @@ export class Backend {
         return true;
     }
 
+    /** @type {import('api').ApiHandler<'testYomitanApi'>} */
+    async _onApiTestYomitanApi({url}) {
+        if (!this._yomitanApi.isEnabled()) {
+            throw new Error('Yomitan Api not enabled');
+        }
+
+        let permissionsOkay = false;
+        try {
+            permissionsOkay = await hasPermissions({permissions: ['nativeMessaging']});
+        } catch (e) {
+            // NOP
+        }
+        if (!permissionsOkay) {
+            throw new Error('Insufficient permissions');
+        }
+
+        const disconnect = !this._yomitanApi.isConnected();
+        try {
+            const version = await this._yomitanApi.getRemoteVersion(url);
+            if (version === null) {
+                throw new Error('Could not connect to native Yomitan API component');
+            }
+
+            const localVersion = this._yomitanApi.getLocalVersion();
+            if (version !== localVersion) {
+                throw new Error(`Yomitan API component version not supported: ${version}`);
+            }
+        } finally {
+            // Disconnect if the connection was previously disconnected
+            if (disconnect && this._yomitanApi.isEnabled()) {
+                this._yomitanApi.disconnect();
+            }
+        }
+
+        return true;
+    }
+
     /** @type {import('api').ApiHandler<'isTextLookupWorthy'>} */
     _onApiIsTextLookupWorthy({text, language}) {
         return isTextLookupWorthy(text, language);
@@ -970,6 +1151,22 @@ export class Backend {
         return getLanguageSummaries();
     }
 
+    /** @type {import('api').ApiHandler<'heartbeat'>} */
+    _onApiHeartbeat() {
+        return void 0;
+    }
+
+    /** @type {import('api').ApiHandler<'forceSync'>} */
+    async _onApiForceSync() {
+        try {
+            await this._anki.makeAnkiSync();
+        } catch (e) {
+            log.error(e);
+            throw e;
+        }
+        return void 0;
+    }
+
     // Command handlers
 
     /**
@@ -1001,7 +1198,8 @@ export class Backend {
             const parsedUrl = new URL(url);
             const parsedBaseUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
             const parsedMode = parsedUrl.searchParams.get('mode');
-            return parsedBaseUrl === baseUrl && (parsedMode === mode || (!parsedMode && mode === 'existingOrNewTab'));
+            const modeIsNotSpecial = mode === 'existingOrNewTab' || mode === 'existingOrCurrentTab';
+            return parsedBaseUrl === baseUrl && (parsedMode === mode || (!parsedMode && modeIsNotSpecial));
         };
 
         const openInTab = async () => {
@@ -1029,12 +1227,32 @@ export class Backend {
                 }
                 await this._createTab(queryUrl);
                 return;
+            case 'existingOrCurrentTab':
+                try {
+                    if (await openInTab()) { return; }
+                } catch (e) {
+                    // NOP
+                }
+                await this._updateTab(queryUrl);
+                return;
             case 'newTab':
                 await this._createTab(queryUrl);
                 return;
             case 'popup':
                 return;
         }
+    }
+
+    /**
+     * @param {undefined|{mode: import('backend').Mode, query?: string}} params
+     */
+    async _onCommandOpenSearchPageCurrentTab(params) {
+        /** @type {{mode: import('backend').Mode, query?: string}} */
+        const newParams = {mode: 'existingOrCurrentTab'};
+        if (typeof params === 'object' && params !== null) {
+            newParams.query = params.query;
+        }
+        await this._onCommandOpenSearchPage(newParams);
     }
 
     /**
@@ -1304,13 +1522,30 @@ export class Backend {
 
         this._mecab.setEnabled(options.parsing.enableMecabParser && enabled);
 
+        void this._yomitanApi.setEnabled(options.general.enableYomitanApi && enabled);
+
         if (options.clipboard.enableBackgroundMonitor && enabled) {
             this._clipboardMonitor.start();
         } else {
             this._clipboardMonitor.stop();
         }
 
+        this._setupContextMenu(options);
+
+        void this._accessibilityController.update(this._getOptionsFull(false));
+
+        this._textParseCache.clear();
+
+        this._sendMessageAllTabsIgnoreResponse({action: 'applicationOptionsUpdated', params: {source}});
+    }
+
+    /**
+     * @param {import('settings').ProfileOptions} options
+     */
+    _setupContextMenu(options) {
         try {
+            if (!chrome.contextMenus) { return; }
+
             if (options.general.enableContextMenuScanSelected) {
                 chrome.contextMenus.create({
                     id: 'yomitan_lookup',
@@ -1328,10 +1563,19 @@ export class Backend {
         } catch (e) {
             log.error(e);
         }
+    }
 
-        void this._accessibilityController.update(this._getOptionsFull(false));
-
-        this._sendMessageAllTabsIgnoreResponse({action: 'applicationOptionsUpdated', params: {source}});
+    /** */
+    _attachOmniboxListener() {
+        try {
+            if (!chrome.omnibox) { return; }
+            chrome.omnibox.onInputEntered.addListener((text) => {
+                const newURL = 'search.html?query=' + encodeURIComponent(text);
+                void chrome.tabs.create({url: newURL});
+            });
+        } catch (e) {
+            log.error(e);
+        }
     }
 
     /**
@@ -1457,39 +1701,72 @@ export class Backend {
      * @param {string} text
      * @param {number} scanLength
      * @param {import('settings').OptionsContext} optionsContext
+     * @param {import('api').ApiParam<'parseText', 'useAllFrequencyDictionaries'>} useAllFrequencyDictionaries
      * @returns {Promise<import('api').ParseTextLine[]>}
      */
-    async _textParseScanning(text, scanLength, optionsContext) {
+    async _textParseScanning(text, scanLength, optionsContext, useAllFrequencyDictionaries) {
         /** @type {import('translator').FindTermsMode} */
         const mode = 'simple';
         const options = this._getProfileOptions(optionsContext, false);
-        const details = {matchType: /** @type {import('translation').FindTermsMatchType} */ ('exact'), deinflect: true};
+
+        /** @type {import('api').FindTermsDetails} */
+        const details = {matchType: 'exact', deinflect: true};
         const findTermsOptions = this._getTranslatorFindTermsOptions(mode, details, options);
+        if (useAllFrequencyDictionaries) { findTermsOptions.useAllFrequencyDictionaries = true; }
         /** @type {import('api').ParseTextLine[]} */
         const results = [];
         let previousUngroupedSegment = null;
         let i = 0;
         const ii = text.length;
         while (i < ii) {
-            const {dictionaryEntries, originalTextLength} = await this._translator.findTerms(
-                mode,
-                text.substring(i, i + scanLength),
-                findTermsOptions,
-            );
             const codePoint = /** @type {number} */ (text.codePointAt(i));
             const character = String.fromCodePoint(codePoint);
-            if (
-                dictionaryEntries.length > 0 &&
+            const substring = text.substring(i, i + scanLength);
+            const cacheKey = `${optionsContext.index}:${substring}`;
+            let cached = this._textParseCache.get(cacheKey);
+            if (typeof cached === 'undefined') {
+                const {dictionaryEntries, originalTextLength} = await this._translator.findTerms(
+                    mode,
+                    substring,
+                    findTermsOptions,
+                );
+                /** @type {import('api').ParseTextSegment[]} */
+                const textSegments = [];
+                if (dictionaryEntries.length > 0 &&
                 originalTextLength > 0 &&
                 (originalTextLength !== character.length || isCodePointJapanese(codePoint))
-            ) {
-                previousUngroupedSegment = null;
-                const {headwords: [{term, reading}]} = dictionaryEntries[0];
-                const source = text.substring(i, i + originalTextLength);
-                const textSegments = [];
-                for (const {text: text2, reading: reading2} of distributeFuriganaInflected(term, reading, source)) {
-                    textSegments.push({text: text2, reading: reading2});
+                ) {
+                    const {headwords: [{term, reading}]} = dictionaryEntries[0];
+                    const source = substring.substring(0, originalTextLength);
+                    for (const {text: text2, reading: reading2} of distributeFuriganaInflected(term, reading, source)) {
+                        textSegments.push({text: text2, reading: reading2});
+                    }
+                    if (textSegments.length > 0) {
+                        const token = textSegments.map((s) => s.text).join('');
+                        const trimmedHeadwords = [];
+                        for (const dictionaryEntry of dictionaryEntries) {
+                            const validHeadwords = [];
+                            for (const headword of dictionaryEntry.headwords) {
+                                const validSources = [];
+                                for (const src of headword.sources) {
+                                    if (src.originalText !== token) { continue; }
+                                    if (!src.isPrimary) { continue; }
+                                    if (src.matchType !== 'exact') { continue; }
+                                    validSources.push(src);
+                                }
+                                if (validSources.length > 0) { validHeadwords.push({term: headword.term, reading: headword.reading, sources: validSources, frequencies: dictionaryEntry.frequencies.filter((f) => f.headwordIndex === headword.headwordIndex)}); }
+                            }
+                            if (validHeadwords.length > 0) { trimmedHeadwords.push(validHeadwords); }
+                        }
+                        textSegments[0].headwords = trimmedHeadwords;
+                    }
                 }
+                cached = {originalTextLength, textSegments};
+                if (typeof optionsContext.index !== 'undefined') { this._textParseCache.set(cacheKey, cached); }
+            }
+            const {originalTextLength, textSegments} = cached;
+            if (textSegments.length > 0) {
+                previousUngroupedSegment = null;
                 results.push(textSegments);
                 i += originalTextLength;
             } else {
@@ -1523,18 +1800,25 @@ export class Backend {
             /** @type {import('api').ParseTextLine[]} */
             const result = [];
             for (const line of lines) {
-                for (const {term, reading, source} of line) {
+                for (const {term, reading, source, lemma, lemma_reading} of line) {
                     const termParts = [];
+                    let isFirstPart = true;
                     for (const {text: text2, reading: reading2} of distributeFuriganaInflected(
                         term.length > 0 ? term : source,
                         jpConvertKatakanaToHiragana(reading),
                         source,
                     )) {
-                        termParts.push({text: text2, reading: reading2});
+                        /** @type {import('api').ParseTextSegment} */
+                        const termPart = {text: text2, reading: reading2};
+                        if (isFirstPart) {
+                            termPart.lemma = lemma;
+                            termPart.lemmaReading = jpConvertKatakanaToHiragana(lemma_reading);
+                            isFirstPart = false;
+                        }
+                        termParts.push(termPart);
                     }
                     result.push(termParts);
                 }
-                result.push([{text: '\n', reading: ''}]);
             }
             results.push([name, result]);
         }
@@ -2057,6 +2341,7 @@ export class Backend {
         const {windowId} = tab;
 
         let token = null;
+        const errors = [];
         try {
             if (typeof tabId === 'number' && typeof frameId === 'number') {
                 const action = 'frontendSetAllVisibleOverride';
@@ -2064,16 +2349,29 @@ export class Backend {
                 token = await this._sendMessageTabPromise(tabId, {action, params}, {frameId});
             }
 
-            return await new Promise((resolve, reject) => {
-                chrome.tabs.captureVisibleTab(windowId, {format, quality}, (result) => {
-                    const e = chrome.runtime.lastError;
-                    if (e) {
-                        reject(new Error(e.message));
-                    } else {
-                        resolve(result);
-                    }
+            try {
+                return await new Promise((resolve, reject) => {
+                    chrome.tabs.captureVisibleTab(windowId, {format, quality}, (result) => {
+                        const e = chrome.runtime.lastError;
+                        if (e) {
+                            reject(new Error(e.message));
+                        } else {
+                            resolve(result);
+                        }
+                    });
                 });
-            });
+            } catch (e) {
+                errors.push(e);
+            }
+
+            // Fallback for some Firefox. Usually `chrome.tabs.captureVisibleTab` works but occasionally it doesn't
+            try {
+                return await browser.tabs.captureVisibleTab(windowId, {format, quality});
+            } catch (e) {
+                errors.push(e);
+            }
+
+            throw new Error('Failed to screenshot, errors: [' + errors.join(', ') + ']');
         } finally {
             if (token !== null) {
                 const action = 'frontendClearAllVisibleOverride';
@@ -2171,7 +2469,7 @@ export class Backend {
         const {term, reading} = definitionDetails;
         if (term.length === 0 && reading.length === 0) { return null; }
 
-        const {sources, preferredAudioIndex, idleTimeout, languageSummary} = details;
+        const {sources, preferredAudioIndex, idleTimeout, languageSummary, enableDefaultAudioSources} = details;
         let data;
         let contentType;
         try {
@@ -2182,6 +2480,7 @@ export class Backend {
                 reading,
                 idleTimeout,
                 languageSummary,
+                enableDefaultAudioSources,
             ));
         } catch (e) {
             const error = this._getAudioDownloadError(e);
@@ -2193,7 +2492,7 @@ export class Backend {
 
         let extension = contentType !== null ? getFileExtensionFromAudioMediaType(contentType) : null;
         if (extension === null) { extension = '.mp3'; }
-        let fileName = this._generateAnkiNoteMediaFileName('yomitan_audio', extension, timestamp);
+        let fileName = await mediaFileNameHashOrTimestamp('yomitan_audio', data, extension, null, timestamp);
         fileName = fileName.replace(/\]/g, '');
         return await ankiConnect.storeMediaFile(fileName, data);
     }
@@ -2214,7 +2513,7 @@ export class Backend {
             throw new Error('Unknown media type for screenshot image');
         }
 
-        const fileName = this._generateAnkiNoteMediaFileName('yomitan_browser_screenshot', extension, timestamp);
+        const fileName = generateAnkiNoteMediaFileName('yomitan_browser_screenshot', extension, timestamp);
         return await ankiConnect.storeMediaFile(fileName, data);
     }
 
@@ -2237,7 +2536,7 @@ export class Backend {
 
         const fileName = dataUrl === this._ankiClipboardImageDataUrlCache && this._ankiClipboardImageFilenameCache ?
             this._ankiClipboardImageFilenameCache :
-            this._generateAnkiNoteMediaFileName('yomitan_clipboard_image', extension, timestamp);
+            generateAnkiNoteMediaFileName('yomitan_clipboard_image', extension, timestamp);
 
         const storedFileName = await ankiConnect.storeMediaFile(fileName, data);
 
@@ -2287,11 +2586,7 @@ export class Backend {
             if (media !== null) {
                 const {content, mediaType} = media;
                 const extension = getFileExtensionFromImageMediaType(mediaType);
-                fileName = this._generateAnkiNoteMediaFileName(
-                    `yomitan_dictionary_media_${i + 1}`,
-                    extension !== null ? extension : '',
-                    timestamp,
-                );
+                fileName = await mediaFileNameHashOrTimestamp('yomitan_dictionary_media', content, extension, i, timestamp);
                 try {
                     fileName = await ankiConnect.storeMediaFile(fileName, content);
                 } catch (e) {
@@ -2368,47 +2663,6 @@ export class Backend {
     }
 
     /**
-     * @param {string} prefix
-     * @param {string} extension
-     * @param {number} timestamp
-     * @returns {string}
-     */
-    _generateAnkiNoteMediaFileName(prefix, extension, timestamp) {
-        let fileName = prefix;
-
-        fileName += `_${this._ankNoteDateToString(new Date(timestamp))}`;
-        fileName += extension;
-
-        fileName = this._replaceInvalidFileNameCharacters(fileName);
-
-        return fileName;
-    }
-
-    /**
-     * @param {string} fileName
-     * @returns {string}
-     */
-    _replaceInvalidFileNameCharacters(fileName) {
-        // eslint-disable-next-line no-control-regex
-        return fileName.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-');
-    }
-
-    /**
-     * @param {Date} date
-     * @returns {string}
-     */
-    _ankNoteDateToString(date) {
-        const year = date.getUTCFullYear();
-        const month = date.getUTCMonth().toString().padStart(2, '0');
-        const day = date.getUTCDate().toString().padStart(2, '0');
-        const hours = date.getUTCHours().toString().padStart(2, '0');
-        const minutes = date.getUTCMinutes().toString().padStart(2, '0');
-        const seconds = date.getUTCSeconds().toString().padStart(2, '0');
-        const milliseconds = date.getUTCMilliseconds().toString().padStart(3, '0');
-        return `${year}-${month}-${day}-${hours}-${minutes}-${seconds}-${milliseconds}`;
-    }
-
-    /**
      * @param {string} dataUrl
      * @returns {{mediaType: string, data: string}}
      * @throws {Error}
@@ -2455,9 +2709,10 @@ export class Backend {
      * @returns {import('translation').FindTermsOptions} An options object.
      */
     _getTranslatorFindTermsOptions(mode, details, options) {
-        let {matchType, deinflect} = details;
+        let {matchType, deinflect, primaryReading} = details;
         if (typeof matchType !== 'string') { matchType = /** @type {import('translation').FindTermsMatchType} */ ('exact'); }
         if (typeof deinflect !== 'boolean') { deinflect = true; }
+        if (typeof primaryReading !== 'string') { primaryReading = ''; }
         const enabledDictionaryMap = this._getTranslatorEnabledDictionaryMap(options);
         const {
             general: {mainDictionary, sortFrequencyDictionary, sortFrequencyDictionaryOrder, language},
@@ -2473,7 +2728,6 @@ export class Backend {
             enabledDictionaryMap.set(mainDictionary, {
                 index: enabledDictionaryMap.size,
                 alias: mainDictionary,
-                priority: 0,
                 allowSecondarySearches: false,
                 partsOfSpeechFilter: true,
                 useDeinflections: true,
@@ -2484,6 +2738,7 @@ export class Backend {
         return {
             matchType,
             deinflect,
+            primaryReading,
             mainDictionary,
             sortFrequencyDictionary,
             sortFrequencyDictionaryOrder,
@@ -2493,6 +2748,7 @@ export class Backend {
             enabledDictionaryMap,
             excludeDictionaryDefinitions,
             language,
+            useAllFrequencyDictionaries: false,
         };
     }
 
@@ -2517,11 +2773,10 @@ export class Backend {
         const enabledDictionaryMap = new Map();
         for (const dictionary of options.dictionaries) {
             if (!dictionary.enabled) { continue; }
-            const {name, alias, priority, allowSecondarySearches, partsOfSpeechFilter, useDeinflections} = dictionary;
+            const {name, alias, allowSecondarySearches, partsOfSpeechFilter, useDeinflections} = dictionary;
             enabledDictionaryMap.set(name, {
                 index: enabledDictionaryMap.size,
                 alias,
-                priority,
                 allowSecondarySearches,
                 partsOfSpeechFilter,
                 useDeinflections,
@@ -2543,7 +2798,9 @@ export class Backend {
             for (const {pattern, ignoreCase, replacement} of group) {
                 let patternRegExp;
                 try {
-                    patternRegExp = new RegExp(pattern, ignoreCase ? 'gi' : 'g');
+                    patternRegExp = ignoreCase ?
+                        new RegExp(pattern.replace(/['’]/g, "['’]"), 'gi') :
+                        new RegExp(pattern, 'g');
                 } catch (e) {
                     // Invalid pattern
                     continue;
@@ -2626,6 +2883,23 @@ export class Backend {
                 const e = chrome.runtime.lastError;
                 if (e) {
                     reject(new Error(e.message));
+                } else {
+                    resolve(tab);
+                }
+            });
+        });
+    }
+
+    /**
+     * @param {string} url
+     * @returns {Promise<chrome.tabs.Tab>}
+     */
+    _updateTab(url) {
+        return new Promise((resolve, reject) => {
+            chrome.tabs.update({url}, (tab) => {
+                const e = chrome.runtime.lastError;
+                if (e || !tab) {
+                    reject(new Error(e ? e.message : 'No active tab to update.'));
                 } else {
                     resolve(tab);
                 }
@@ -2723,6 +2997,7 @@ export class Backend {
     _normalizeOpenSettingsPageMode(mode, defaultValue) {
         switch (mode) {
             case 'existingOrNewTab':
+            case 'existingOrCurrentTab':
             case 'newTab':
             case 'popup':
                 return mode;

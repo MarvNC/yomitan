@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2016-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -166,7 +166,8 @@ export class TextSourceRange {
      */
     setStartOffset(length, layoutAwareScan, stopAtWordBoundary = false) {
         if (this._disallowExpandSelection) { return 0; }
-        const state = new DOMTextScanner(this._range.startContainer, this._range.startOffset, !layoutAwareScan, layoutAwareScan, stopAtWordBoundary).seek(-length);
+        let state = new DOMTextScanner(this._range.startContainer, this._range.startOffset, !layoutAwareScan, layoutAwareScan, stopAtWordBoundary);
+        state = state.seek(-length);
         this._range.setStart(state.node, state.offset);
         this._rangeStartOffset = this._range.startOffset;
         this._content = state.content + this._content;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024  Yomitan Authors
+ * Copyright (C) 2023-2026  Yomitan Authors
  * Copyright (C) 2019-2022  Yomichan Authors
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,6 +18,7 @@
 
 import {EventDispatcher} from '../core/event-dispatcher.js';
 import {log} from '../core/log.js';
+import {trimTrailingWhitespacePlusSpace} from '../data/string-util.js';
 import {querySelectorNotNull} from '../dom/query-selector.js';
 import {convertHiraganaToKatakana, convertKatakanaToHiragana, isStringEntirelyKana} from '../language/ja/japanese.js';
 import {TextScanner} from '../language/text-scanner.js';
@@ -51,6 +52,8 @@ export class QueryParser extends EventDispatcher {
         this._useInternalParser = true;
         /** @type {boolean} */
         this._useMecabParser = false;
+        /** @type {boolean} */
+        this._useAllFrequencyDictionaries = false;
         /** @type {import('api').ParseTextResultItem[]} */
         this._parseResults = [];
         /** @type {HTMLElement} */
@@ -66,7 +69,9 @@ export class QueryParser extends EventDispatcher {
             getSearchContext,
             searchTerms: true,
             searchKanji: false,
+            searchOnClick: true,
             textSourceGenerator,
+            browser: null,
         });
         /** @type {?(import('../language/ja/japanese-wanakana.js'))} */
         this._japaneseWanakanaModule = null;
@@ -91,7 +96,7 @@ export class QueryParser extends EventDispatcher {
     /**
      * @param {import('display').QueryParserOptions} display
      */
-    setOptions({selectedParser, termSpacing, readingMode, useInternalParser, useMecabParser, language, scanning}) {
+    setOptions({selectedParser, termSpacing, readingMode, useInternalParser, useMecabParser, useAllFrequencyDictionaries, language, scanning}) {
         let selectedParserChanged = false;
         if (selectedParser === null || typeof selectedParser === 'string') {
             selectedParserChanged = (this._selectedParser !== selectedParser);
@@ -109,6 +114,9 @@ export class QueryParser extends EventDispatcher {
         if (typeof useMecabParser === 'boolean') {
             this._useMecabParser = useMecabParser;
         }
+        if (typeof useAllFrequencyDictionaries === 'boolean') {
+            this._useAllFrequencyDictionaries = useAllFrequencyDictionaries;
+        }
         if (scanning !== null && typeof scanning === 'object') {
             const {scanLength} = scanning;
             if (typeof scanLength === 'number') {
@@ -116,8 +124,9 @@ export class QueryParser extends EventDispatcher {
             }
             this._textScanner.language = language;
             this._textScanner.setOptions(scanning);
+            this._textScanner.setEnabled(true);
         }
-        this._textScanner.setEnabled(true);
+
         if (selectedParserChanged && this._parseResults.length > 0) {
             this._renderParseResult();
         }
@@ -138,7 +147,7 @@ export class QueryParser extends EventDispatcher {
         /** @type {?import('core').TokenObject} */
         const token = {};
         this._setTextToken = token;
-        this._parseResults = await this._api.parseText(text, this._getOptionsContext(), this._scanLength, this._useInternalParser, this._useMecabParser);
+        this._parseResults = await this._api.parseText(text, this._getOptionsContext(), this._scanLength, this._useInternalParser, this._useMecabParser, this._useAllFrequencyDictionaries);
         if (this._setTextToken !== token) { return; }
 
         this._refreshSelectedParser();
@@ -298,18 +307,21 @@ export class QueryParser extends EventDispatcher {
     _createParseResult(data) {
         let offset = 0;
         const fragment = document.createDocumentFragment();
-        for (const term of data) {
+        for (let i = 0; i < data.length; i++) {
+            const term = data[i];
             const termNode = document.createElement('span');
             termNode.className = 'query-parser-term';
             termNode.dataset.offset = `${offset}`;
             for (const {text, reading} of term) {
+                // trimEnd only for final text
+                const trimmedText = i === data.length - 1 ? text.trimEnd() : trimTrailingWhitespacePlusSpace(text);
                 if (reading.length === 0) {
-                    termNode.appendChild(document.createTextNode(text));
+                    termNode.appendChild(document.createTextNode(trimmedText));
                 } else {
-                    const reading2 = this._convertReading(text, reading);
-                    termNode.appendChild(this._createSegment(text, reading2, offset));
+                    const reading2 = this._convertReading(trimmedText, reading);
+                    termNode.appendChild(this._createSegment(trimmedText, reading2, offset));
                 }
-                offset += text.length;
+                offset += trimmedText.length;
             }
             fragment.appendChild(termNode);
         }
